@@ -10,8 +10,8 @@ interface ProgressTrackerProps {
 export function ProgressTracker({ scaleProgress, repetitionsRequired, currentScale }: ProgressTrackerProps) {
   return (
     <div className="w-full space-y-3">
-      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Progress</h3>
-      <div className="grid gap-2 max-h-[300px] overflow-y-auto pr-2">
+      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider py-2">Progress</h3>
+      <div className="grid gap-2 overflow-y-auto pr-2">
         {scaleProgress.map((scale) => {
           const progress = (scale.successCount / repetitionsRequired) * 100;
           const isCurrent = scale.name === currentScale;

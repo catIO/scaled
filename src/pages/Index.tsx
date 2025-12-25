@@ -180,81 +180,82 @@ export default function Index() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-10 px-4 py-3 flex items-center justify-between bg-background/80 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      {/* Main Container Box */}
+      <div className="w-full max-w-6xl bg-card rounded-2xl border border-border material-shadow-xl relative">
+        {/* Top Left Controls */}
+        <div className="absolute top-4 left-4 flex items-center gap-2 bg-card rounded-2xl p-1 border border-border z-10">
           <MetronomeIndicator
             settings={settings.metronome}
             isPlaying={isPlaying}
             onToggle={toggle}
           />
+          <Settings
+            settings={settings}
+            onSettingsChange={handleSettingsChange}
+            onReset={handleReset}
+          />
         </div>
-        <Settings
-          settings={settings}
-          onSettingsChange={handleSettingsChange}
-          onReset={handleReset}
-        />
-      </header>
 
-      {/* Main Content */}
-      <main className="container max-w-6xl mx-auto px-4 pt-24 pb-8">
-        <div className="grid lg:grid-cols-[1fr,320px] gap-8 items-start">
-          {/* Center Section - Current Scale */}
-          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
-            {/* Title */}
-            <div className="text-center space-y-2 animate-slide-up">
-              <h1 className="text-3xl font-bold text-foreground">Scaled</h1>
-              <p className="text-muted-foreground">
-                {completedCount} of {practiceState.scaleProgress.length} scales completed
-              </p>
+        {/* Main Content */}
+        <main className="p-8 pt-20">
+          <div className="grid lg:grid-cols-[1fr,320px] gap-8 items-start">
+            {/* Center Section - Current Scale */}
+            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
+              {/* Title */}
+              <div className="text-center space-y-2 animate-slide-up">
+                <h1 className="text-3xl font-bold text-foreground">Scaled</h1>
+                <p className="text-muted-foreground">
+                  {completedCount} of {practiceState.scaleProgress.length} scales completed
+                </p>
+              </div>
+
+              {/* Current Scale Card or Completion */}
+              {allCompleted ? (
+                <div className="text-center space-y-6 animate-scale-in">
+                  <div className="w-24 h-24 mx-auto bg-success/10 rounded-full flex items-center justify-center">
+                    <MdEmojiEvents className="w-10 h-10 text-success" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-3xl font-bold text-foreground">
+                      Practice Complete!
+                    </h2>
+                    <p className="text-muted-foreground">
+                      You've mastered all {practiceState.scaleProgress.length} scales
+                    </p>
+                  </div>
+                  <Button
+                    size="lg"
+                    onClick={handleReset}
+                    className="rounded-xl h-14 px-8"
+                  >
+                    <MdRefresh className="w-5 h-5 mr-2" />
+                    Start New Session
+                  </Button>
+                </div>
+              ) : currentScale ? (
+                <ScaleCard
+                  scaleName={currentScale.name}
+                  successCount={currentScale.successCount}
+                  repetitionsRequired={settings.repetitionsRequired}
+                  onAccept={handleAccept}
+                  onDecline={handleDecline}
+                  isCompleted={currentScale.completed}
+                />
+              ) : null}
             </div>
 
-            {/* Current Scale Card or Completion */}
-            {allCompleted ? (
-              <div className="text-center space-y-6 animate-scale-in">
-                <div className="w-24 h-24 mx-auto bg-success/10 rounded-full flex items-center justify-center">
-                  <MdEmojiEvents className="w-12 h-12 text-success" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-3xl font-bold text-foreground">
-                    Practice Complete!
-                  </h2>
-                  <p className="text-muted-foreground">
-                    You've mastered all {practiceState.scaleProgress.length} scales
-                  </p>
-                </div>
-                <Button
-                  size="lg"
-                  onClick={handleReset}
-                  className="rounded-xl h-14 px-8"
-                >
-                  <MdRefresh className="w-5 h-5 mr-2" />
-                  Start New Session
-                </Button>
-              </div>
-            ) : currentScale ? (
-              <ScaleCard
-                scaleName={currentScale.name}
-                successCount={currentScale.successCount}
+            {/* Sidebar - Progress Tracker */}
+            <aside className="lg:sticky lg:top-24 bg-muted/50 rounded-2xl p-6">
+              <ProgressTracker
+                scaleProgress={practiceState.scaleProgress}
                 repetitionsRequired={settings.repetitionsRequired}
-                onAccept={handleAccept}
-                onDecline={handleDecline}
-                isCompleted={currentScale.completed}
+                currentScale={currentScale?.name || ''}
               />
-            ) : null}
+            </aside>
           </div>
-
-          {/* Sidebar - Progress Tracker */}
-          <aside className="lg:sticky lg:top-24 bg-card rounded-2xl p-6 material-shadow-lg">
-            <ProgressTracker
-              scaleProgress={practiceState.scaleProgress}
-              repetitionsRequired={settings.repetitionsRequired}
-              currentScale={currentScale?.name || ''}
-            />
-          </aside>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

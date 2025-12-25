@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MdSettings, MdAdd, MdDelete, MdClose } from 'react-icons/md';
+import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -61,9 +62,9 @@ export function Settings({ settings, onSettingsChange, onReset }: SettingsProps)
         <Button
           variant="ghost"
           size="icon"
-          className="h-12 w-12 rounded-2xl bg-card border border-border hover:bg-card/80 p-0"
+          className={`${CONTROL_BUTTON_SIZE} rounded-xl hover:bg-muted p-0 flex items-center justify-center`}
         >
-          <MdSettings className="w-6 h-6 text-foreground" />
+          <MdSettings className={`${CONTROL_ICON_SIZE} text-foreground`} />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">

@@ -20,7 +20,7 @@ export function ScaleCard({
 }: ScaleCardProps) {
   return (
     <div className="w-full max-w-md animate-scale-in">
-      <div className="bg-card rounded-2xl material-shadow-xl p-8 text-center space-y-6">
+      <div className="bg-muted rounded-2xl material-shadow-xl p-8 text-center space-y-6">
         <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
           <MdMusicNote className="w-8 h-8 text-primary" />
         </div>
@@ -34,13 +34,13 @@ export function ScaleCard({
           </h2>
         </div>
 
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2 py-4">
           <div className="flex gap-1">
             {Array.from({ length: repetitionsRequired }).map((_, i) => (
               <div
                 key={i}
-                className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  i < successCount ? 'bg-success scale-110' : 'bg-muted'
+                className={`w-4 h-4 rounded-full transition-all duration-300 ${
+                  i < successCount ? 'bg-success scale-110' : 'bg-foreground/20'
                 }`}
               />
             ))}
