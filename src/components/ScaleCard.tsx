@@ -54,15 +54,15 @@ export function ScaleCard({
           <div className="flex gap-3 justify-center pt-4">
             <Button
               onClick={onDecline}
-              className="w-16 h-16 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="w-16 h-16 rounded-xl bg-destructive text-white hover:bg-destructive/90 [&_svg]:!w-8 [&_svg]:!h-9"
             >
-              <MdClose className="w-6 h-6" />
+              <MdClose />
             </Button>
             <Button
               onClick={onAccept}
-              className="w-16 h-16 rounded-xl bg-success text-success-foreground hover:bg-success/90"
+              className="w-16 h-16 rounded-xl bg-success text-white hover:bg-success/90 [&_svg]:!w-8 [&_svg]:!h-8"
             >
-              <MdCheck className="w-6 h-6" />
+              <MdCheck />
             </Button>
           </div>
         )}

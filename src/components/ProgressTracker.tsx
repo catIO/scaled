@@ -1,16 +1,31 @@
 import { ScaleProgress } from '@/types/practice';
-import { MdCheck } from 'react-icons/md';
+import { MdCheck, MdEdit } from 'react-icons/md';
+import { Button } from '@/components/ui/button';
+import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 
 interface ProgressTrackerProps {
   scaleProgress: ScaleProgress[];
   repetitionsRequired: number;
   currentScale: string;
+  onOpenSettings?: () => void;
 }
 
-export function ProgressTracker({ scaleProgress, repetitionsRequired, currentScale }: ProgressTrackerProps) {
+export function ProgressTracker({ scaleProgress, repetitionsRequired, currentScale, onOpenSettings }: ProgressTrackerProps) {
   return (
     <div className="w-full space-y-3">
-      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider py-2">Progress</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-m font-bold text-muted-foreground uppercase tracking-wider py-2">Progress</h3>
+        {onOpenSettings && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenSettings}
+            className={`${CONTROL_BUTTON_SIZE} rounded-xl hover:bg-muted p-0 flex items-center justify-center`}
+          >
+            <MdEdit className={`${CONTROL_ICON_SIZE} text-foreground`} />
+          </Button>
+        )}
+      </div>
       <div className="grid gap-2 overflow-y-auto pr-2">
         {scaleProgress.map((scale) => {
           const progress = (scale.successCount / repetitionsRequired) * 100;

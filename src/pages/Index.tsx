@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef, useEffect } from 'react';
+import { useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { MdRefresh, MdEmojiEvents } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,7 @@ export default function Index() {
   );
 
   const { isPlaying, toggle } = useMetronome(settings.metronome);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Track previous scales to detect actual changes
   const prevScalesRef = useRef<string[]>(settings.scales);
@@ -194,6 +195,8 @@ export default function Index() {
             settings={settings}
             onSettingsChange={handleSettingsChange}
             onReset={handleReset}
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
           />
         </div>
 
@@ -251,6 +254,7 @@ export default function Index() {
                 scaleProgress={practiceState.scaleProgress}
                 repetitionsRequired={settings.repetitionsRequired}
                 currentScale={currentScale?.name || ''}
+                onOpenSettings={() => setSettingsOpen(true)}
               />
             </aside>
           </div>

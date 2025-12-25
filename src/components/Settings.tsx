@@ -26,10 +26,14 @@ interface SettingsProps {
   settings: PracticeSettings;
   onSettingsChange: (settings: PracticeSettings) => void;
   onReset: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function Settings({ settings, onSettingsChange, onReset }: SettingsProps) {
-  const [open, setOpen] = useState(false);
+export function Settings({ settings, onSettingsChange, onReset, open: controlledOpen, onOpenChange }: SettingsProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   const [newScale, setNewScale] = useState('');
 
   const addScale = () => {
