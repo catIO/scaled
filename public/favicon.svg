@@ -1,1 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M200-160v-240h120v240H200Zm240 0v-440h120v440H440Zm240 0v-640h120v640H680Z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Solid black background -->
+  <rect width="512" height="512" fill="#000000" rx="0"/>
+  <!-- White bars (three bars of different heights, with padding) -->
+  <rect x="160" y="320" width="64" height="128" fill="#FFFFFF" rx="8"/>
+  <rect x="256" y="224" width="64" height="224" fill="#FFFFFF" rx="8"/>
+  <rect x="352" y="128" width="64" height="320" fill="#FFFFFF" rx="8"/>
+</svg>

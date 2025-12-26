@@ -10,17 +10,19 @@ const svgPath = join(publicDir, 'favicon.svg');
 
 const svgBuffer = readFileSync(svgPath);
 
-// Generate 192x192 icon
-await sharp(svgBuffer)
-  .resize(192, 192)
-  .png()
-  .toFile(join(publicDir, 'icon-192.png'));
+// Generate PNG icons for PWA
+const sizes = [
+  { size: 192, name: 'icon-192.png' },
+  { size: 512, name: 'icon-512.png' },
+];
 
-// Generate 512x512 icon
-await sharp(svgBuffer)
-  .resize(512, 512)
-  .png()
-  .toFile(join(publicDir, 'icon-512.png'));
+for (const { size, name } of sizes) {
+  await sharp(svgBuffer)
+    .resize(size, size)
+    .png()
+    .toFile(join(publicDir, name));
+  console.log(`✅ Generated ${name} (${size}x${size})`);
+}
 
-console.log('✅ Generated PWA icons: icon-192.png and icon-512.png');
+console.log('✅ All PWA icons generated');
 
