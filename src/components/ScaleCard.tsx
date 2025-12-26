@@ -54,12 +54,14 @@ export function ScaleCard({
           <div className="flex gap-3 justify-center pt-4">
             <Button
               onClick={onDecline}
+              aria-label="Mark scale as incomplete"
               className="w-16 h-16 rounded-xl bg-destructive text-white hover:bg-destructive/90 [&_svg]:!w-8 [&_svg]:!h-9"
             >
               <MdClose />
             </Button>
             <Button
               onClick={onAccept}
+              aria-label="Mark scale as completed"
               className="w-16 h-16 rounded-xl bg-success text-white hover:bg-success/90 [&_svg]:!w-8 [&_svg]:!h-8"
             >
               <MdCheck />

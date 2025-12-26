@@ -66,6 +66,7 @@ export function Settings({ settings, onSettingsChange, onReset, open: controlled
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Open settings"
           className={`${CONTROL_BUTTON_SIZE} rounded-xl hover:bg-muted p-0 flex items-center justify-center`}
         >
           <MdSettings className={`${CONTROL_ICON_SIZE} text-foreground`} />
@@ -141,8 +142,8 @@ export function Settings({ settings, onSettingsChange, onReset, open: controlled
                   <Label className="text-xs text-muted-foreground">Tone</Label>
                   <Select
                     value={settings.metronome.tone}
-                    onValueChange={(tone: 'low' | 'medium' | 'high') =>
-                      updateMetronome({ tone })
+                    onValueChange={(tone) =>
+                      updateMetronome({ tone: tone as PracticeSettings['metronome']['tone'] })
                     }
                   >
                     <SelectTrigger>
@@ -171,7 +172,7 @@ export function Settings({ settings, onSettingsChange, onReset, open: controlled
                 onKeyDown={(e) => e.key === 'Enter' && addScale()}
                 className="flex-1"
               />
-              <Button onClick={addScale} size="icon" variant="secondary">
+              <Button onClick={addScale} size="icon" variant="secondary" aria-label="Add scale">
                 <MdAdd className="w-4 h-4" />
               </Button>
             </div>
@@ -187,6 +188,7 @@ export function Settings({ settings, onSettingsChange, onReset, open: controlled
                     variant="ghost"
                     size="icon"
                     onClick={() => removeScale(scale)}
+                    aria-label={`Remove scale ${scale}`}
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
                   >
                     <MdDelete className="w-4 h-4" />

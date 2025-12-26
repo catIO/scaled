@@ -49,7 +49,10 @@ export default function Index() {
     DEFAULT_SETTINGS
   );
 
-  const initialPracticeState = initializePracticeState(settings);
+  const initialPracticeState = useMemo(
+    () => initializePracticeState(settings),
+    [settings]
+  );
   const [practiceState, setPracticeState] = useLocalStorage<PracticeState>(
     'scale-practice-state',
     initialPracticeState
@@ -57,6 +60,9 @@ export default function Index() {
 
   const { isPlaying, toggle } = useMetronome(settings.metronome);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  
+  // Track pending navigation to prevent race conditions
+  const pendingNavigationRef = useRef<number | null>(null);
 
   // Track previous scales to detect actual changes
   const prevScalesRef = useRef<string[]>(settings.scales);
@@ -138,6 +144,12 @@ export default function Index() {
   }, [setPracticeState]);
 
   const handleAccept = useCallback(() => {
+    // Clear any pending navigation to prevent race conditions
+    if (pendingNavigationRef.current !== null) {
+      clearTimeout(pendingNavigationRef.current);
+      pendingNavigationRef.current = null;
+    }
+
     setPracticeState((prev) => {
       const orderIndex = prev.practiceOrder[prev.currentScaleIndex];
       const newProgress = [...prev.scaleProgress];
@@ -162,7 +174,10 @@ export default function Index() {
     });
 
     // Move to next after a brief delay
-    setTimeout(moveToNextScale, 500);
+    pendingNavigationRef.current = window.setTimeout(() => {
+      moveToNextScale();
+      pendingNavigationRef.current = null;
+    }, 500);
   }, [settings.repetitionsRequired, fireConfetti, moveToNextScale, setPracticeState]);
 
   const handleDecline = useCallback(() => {
@@ -179,6 +194,15 @@ export default function Index() {
     },
     [setSettings]
   );
+
+  // Cleanup pending navigation on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingNavigationRef.current !== null) {
+        clearTimeout(pendingNavigationRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">

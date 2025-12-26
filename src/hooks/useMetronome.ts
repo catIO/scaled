@@ -81,7 +81,7 @@ export function useMetronome(settings: MetronomeSettings) {
     } else if (!settings.enabled && isPlaying) {
       stop();
     }
-  }, [settings.bpm]);
+  }, [settings.bpm, settings.enabled, settings.tone, settings.volume, isPlaying, start, stop]);
 
   // Cleanup on unmount
   useEffect(() => {

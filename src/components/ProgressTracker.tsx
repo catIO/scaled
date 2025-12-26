@@ -20,6 +20,7 @@ export function ProgressTracker({ scaleProgress, repetitionsRequired, currentSca
             variant="ghost"
             size="icon"
             onClick={onOpenSettings}
+            aria-label="Open settings"
             className={`${CONTROL_BUTTON_SIZE} rounded-xl hover:bg-muted p-0 flex items-center justify-center`}
           >
             <MdEdit className={`${CONTROL_ICON_SIZE} text-foreground`} />

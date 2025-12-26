@@ -14,6 +14,7 @@ export function MetronomeIndicator({ settings, isPlaying, onToggle }: MetronomeI
     <Button
       variant="ghost"
       onClick={onToggle}
+      aria-label={isPlaying ? 'Pause metronome' : 'Start metronome'}
       className={`${CONTROL_BUTTON_SIZE} rounded-xl hover:bg-muted p-0 flex items-center justify-center`}
       disabled={!settings.enabled}
     >
