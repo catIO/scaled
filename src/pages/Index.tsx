@@ -204,6 +204,34 @@ export default function Index() {
     };
   }, []);
 
+  // Spacebar to toggle metronome
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only trigger if spacebar is pressed
+      if (e.code !== 'Space' || e.key !== ' ') return;
+
+      // Don't trigger if user is typing in an input field
+      const activeElement = document.activeElement;
+      if (
+        activeElement &&
+        (activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.isContentEditable)
+      ) {
+        return;
+      }
+
+      // Only toggle if metronome is enabled
+      if (settings.metronome.enabled) {
+        e.preventDefault();
+        toggle();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggle, settings.metronome.enabled]);
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       {/* Main Container Box */}

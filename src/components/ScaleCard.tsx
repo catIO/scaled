@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { MdCheck, MdClose, MdMusicNote } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
+import { getRandomFingerCombination } from '@/lib/fingerCombinations';
 
 interface ScaleCardProps {
   scaleName: string;
@@ -18,6 +20,14 @@ export function ScaleCard({
   onDecline,
   isCompleted,
 }: ScaleCardProps) {
+  // Generate a new random finger combination each time the scale is displayed
+  const [fingerCombination, setFingerCombination] = useState(() => getRandomFingerCombination());
+
+  // Update finger combination when scale name changes
+  useEffect(() => {
+    setFingerCombination(getRandomFingerCombination());
+  }, [scaleName]);
+
   return (
     <div className="w-full max-w-md animate-scale-in">
       <div className="bg-muted rounded-2xl material-shadow-xl p-8 text-center space-y-6">
@@ -32,9 +42,12 @@ export function ScaleCard({
           <h2 className="text-4xl font-bold text-card-foreground">
             {scaleName}
           </h2>
+          <p className="text-base text-muted-foreground text-lg pb-0">
+            {fingerCombination}
+          </p>
         </div>
 
-        <div className="flex items-center justify-center gap-2 py-4">
+        <div className="flex items-center justify-center gap-2 py-4 pt-2">
           <div className="flex gap-1">
             {Array.from({ length: repetitionsRequired }).map((_, i) => (
               <div
