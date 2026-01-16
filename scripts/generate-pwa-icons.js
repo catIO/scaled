@@ -26,3 +26,4 @@ for (const { size, name } of sizes) {
 
 console.log('✅ All PWA icons generated');
 
+

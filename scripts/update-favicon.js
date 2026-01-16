@@ -34,3 +34,4 @@ writeFileSync(join(publicDir, 'favicon.ico'), icoBuffer);
 
 console.log('✅ Generated favicon.ico from favicon.svg');
 
+

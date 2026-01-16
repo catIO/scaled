@@ -29,3 +29,4 @@ echo "1. Quit and restart your browser completely"
 echo "2. Visit your app URL"
 echo "3. You should see a fresh install prompt"
 
+
