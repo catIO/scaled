@@ -15,6 +15,7 @@ export interface PracticeSettings {
   scales: string[];
   repetitionsRequired: number;
   metronome: MetronomeSettings;
+  fingerPatterns: string[]; // array of finger patterns to use for all scales
 }
 
 export interface PracticeState {
@@ -40,4 +41,5 @@ export const DEFAULT_SETTINGS: PracticeSettings = {
     volume: 70,
     tone: 'medium',
   },
+  fingerPatterns: [],
 };

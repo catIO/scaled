@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { MdSettings, MdAdd, MdDelete, MdClose } from 'react-icons/md';
+import { MdSettings, MdAdd, MdDelete } from 'react-icons/md';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import {
   Dialog,
@@ -20,7 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '@/components/ui/tabs';
 import { PracticeSettings } from '@/types/practice';
+
+const AVAILABLE_FINGER_PATTERNS = ['i-m', 'm-i', 'm-a', 'a-m', 'i-a', 'a-i', 'a-m-i'] as const;
 
 interface SettingsProps {
   settings: PracticeSettings;
@@ -53,11 +60,20 @@ export function Settings({ settings, onSettingsChange, onReset, open: controlled
     });
   };
 
-  const updateMetronome = (updates: Partial<typeof settings.metronome>) => {
-    onSettingsChange({
-      ...settings,
-      metronome: { ...settings.metronome, ...updates },
-    });
+
+  const toggleFingerPattern = (pattern: string) => {
+    const currentPatterns = settings.fingerPatterns || [];
+    if (currentPatterns.includes(pattern)) {
+      onSettingsChange({
+        ...settings,
+        fingerPatterns: currentPatterns.filter((p) => p !== pattern),
+      });
+    } else {
+      onSettingsChange({
+        ...settings,
+        fingerPatterns: [...currentPatterns, pattern],
+      });
+    }
   };
 
   return (
@@ -72,133 +88,120 @@ export function Settings({ settings, onSettingsChange, onReset, open: controlled
           <MdSettings className={`${CONTROL_ICON_SIZE} text-foreground`} />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">Practice Settings</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Repetitions */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Required Repetitions</Label>
-            <div className="flex items-center gap-4">
-              <Slider
-                value={[settings.repetitionsRequired]}
-                onValueChange={([value]) =>
-                  onSettingsChange({ ...settings, repetitionsRequired: value })
-                }
-                min={1}
-                max={10}
-                step={1}
-                className="flex-1"
-              />
-              <span className="w-12 text-center text-lg font-bold text-primary">
-                {settings.repetitionsRequired}
-              </span>
-            </div>
-          </div>
+        <Tabs defaultValue="scales" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="scales">Scales</TabsTrigger>
+            <TabsTrigger value="fingers">Finger Patterns</TabsTrigger>
+          </TabsList>
 
-          {/* Metronome Settings */}
-          <div className="space-y-4 p-4 bg-muted/50 rounded-xl">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Metronome</Label>
-              <Switch
-                checked={settings.metronome.enabled}
-                onCheckedChange={(enabled) => updateMetronome({ enabled })}
-              />
-            </div>
-
-            {settings.metronome.enabled && (
-              <div className="space-y-4 animate-slide-up">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label className="text-xs text-muted-foreground">BPM</Label>
-                    <span className="text-xs font-medium">{settings.metronome.bpm}</span>
-                  </div>
-                  <Slider
-                    value={[settings.metronome.bpm]}
-                    onValueChange={([bpm]) => updateMetronome({ bpm })}
-                    min={40}
-                    max={200}
-                    step={1}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label className="text-xs text-muted-foreground">Volume</Label>
-                    <span className="text-xs font-medium">{settings.metronome.volume}%</span>
-                  </div>
-                  <Slider
-                    value={[settings.metronome.volume]}
-                    onValueChange={([volume]) => updateMetronome({ volume })}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Tone</Label>
-                  <Select
-                    value={settings.metronome.tone}
-                    onValueChange={(tone) =>
-                      updateMetronome({ tone: tone as PracticeSettings['metronome']['tone'] })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low (220 Hz)</SelectItem>
-                      <SelectItem value="medium">Medium (440 Hz)</SelectItem>
-                      <SelectItem value="high">High (880 Hz)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          {/* Scales Tab */}
+          <TabsContent value="scales" className="space-y-6 mt-4">
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Required Repetitions</Label>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[settings.repetitionsRequired]}
+                  onValueChange={([value]) =>
+                    onSettingsChange({ ...settings, repetitionsRequired: value })
+                  }
+                  min={1}
+                  max={10}
+                  step={1}
+                  className="flex-1"
+                />
+                <span className="w-12 text-center text-lg font-bold text-primary">
+                  {settings.repetitionsRequired}
+                </span>
               </div>
-            )}
-          </div>
-
-          {/* Scales */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Scales to Practice</Label>
-            
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add new scale..."
-                value={newScale}
-                onChange={(e) => setNewScale(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addScale()}
-                className="flex-1"
-              />
-              <Button onClick={addScale} size="icon" variant="secondary" aria-label="Add scale">
-                <MdAdd className="w-4 h-4" />
-              </Button>
             </div>
 
-            <div className="max-h-48 overflow-y-auto space-y-2">
-              {settings.scales.map((scale) => (
-                <div
-                  key={scale}
-                  className="flex items-center justify-between bg-card p-3 rounded-lg material-shadow-sm"
-                >
-                  <span className="text-sm">{scale}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeScale(scale)}
-                    aria-label={`Remove scale ${scale}`}
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Scales to Practice</Label>
+              
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add new scale..."
+                  value={newScale}
+                  onChange={(e) => setNewScale(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addScale()}
+                  className="flex-1"
+                />
+                <Button onClick={addScale} size="icon" variant="secondary" aria-label="Add scale">
+                  <MdAdd className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {settings.scales.map((scale) => (
+                  <div
+                    key={scale}
+                    className="flex items-center justify-between bg-card p-3 rounded-lg material-shadow-sm"
                   >
-                    <MdDelete className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
+                    <span className="text-sm">{scale}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeScale(scale)}
+                      aria-label={`Remove scale ${scale}`}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    >
+                      <MdDelete className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          </TabsContent>
 
-          {/* Reset Button */}
+          {/* Finger Patterns Tab */}
+          <TabsContent value="fingers" className="space-y-6 mt-4">
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium">Right Hand Finger Patterns</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Select finger patterns to practice. Patterns will be randomly selected during practice for all scales.
+                </p>
+              </div>
+
+              <div className="p-4 bg-card rounded-lg border border-border space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {AVAILABLE_FINGER_PATTERNS.map((pattern) => {
+                    const isSelected = (settings.fingerPatterns || []).includes(pattern);
+                    return (
+                      <Button
+                        key={pattern}
+                        variant={isSelected ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => toggleFingerPattern(pattern)}
+                        className="h-10 px-4"
+                      >
+                        {pattern}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {(settings.fingerPatterns || []).length > 0 && (
+                  <div className="text-xs text-muted-foreground pt-2">
+                    Selected: {(settings.fingerPatterns || []).join(', ')}
+                  </div>
+                )}
+                {(settings.fingerPatterns || []).length === 0 && (
+                  <div className="text-xs text-muted-foreground pt-2">
+                    No patterns selected. Default patterns will be used.
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Reset Button */}
+        <div className="pt-4 border-t">
           <Button
             variant="outline"
             onClick={() => {

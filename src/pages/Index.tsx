@@ -44,10 +44,46 @@ function initializePracticeState(settings: PracticeSettings): PracticeState {
 }
 
 export default function Index() {
-  const [settings, setSettings] = useLocalStorage<PracticeSettings>(
+  const [rawSettings, setRawSettings] = useLocalStorage<PracticeSettings>(
     'scale-practice-settings',
     DEFAULT_SETTINGS
   );
+
+  // Migrate old settings and ensure fingerPatterns is properly initialized
+  const settings = useMemo(() => {
+    const migrated = { ...rawSettings };
+    let needsUpdate = false;
+    
+    // Remove old fingerCombinations property if it exists
+    if ('fingerCombinations' in migrated) {
+      delete (migrated as any).fingerCombinations;
+      needsUpdate = true;
+    }
+    
+    // Ensure fingerPatterns exists and is an array
+    // Also clear old format patterns (like 'im', 'ma', 'am') - only keep new format
+    const newFormatPatterns = ['i-m', 'm-i', 'm-a', 'a-m', 'i-a', 'a-i', 'a-m-i'];
+    if (!migrated.fingerPatterns || !Array.isArray(migrated.fingerPatterns)) {
+      migrated.fingerPatterns = [];
+      needsUpdate = true;
+    } else {
+      // Filter out old format patterns (2 chars without hyphen) and keep only new format
+      const filtered = migrated.fingerPatterns.filter((p: string) => 
+        newFormatPatterns.includes(p)
+      );
+      if (filtered.length !== migrated.fingerPatterns.length) {
+        migrated.fingerPatterns = filtered;
+        needsUpdate = true;
+      }
+    }
+    
+    // If migration was needed, update immediately
+    if (needsUpdate) {
+      setRawSettings(migrated);
+    }
+    
+    return migrated;
+  }, [rawSettings, setRawSettings]);
 
   const initialPracticeState = useMemo(
     () => initializePracticeState(settings),
@@ -190,9 +226,9 @@ export default function Index() {
 
   const handleSettingsChange = useCallback(
     (newSettings: PracticeSettings) => {
-      setSettings(newSettings);
+      setRawSettings(newSettings);
     },
-    [setSettings]
+    [setRawSettings]
   );
 
   // Cleanup pending navigation on unmount
@@ -216,7 +252,7 @@ export default function Index() {
         activeElement &&
         (activeElement.tagName === 'INPUT' ||
           activeElement.tagName === 'TEXTAREA' ||
-          activeElement.isContentEditable)
+          (activeElement instanceof HTMLElement && activeElement.isContentEditable))
       ) {
         return;
       }
@@ -242,6 +278,12 @@ export default function Index() {
             settings={settings.metronome}
             isPlaying={isPlaying}
             onToggle={toggle}
+            onSettingsChange={(updates) => {
+              setRawSettings({
+                ...settings,
+                metronome: { ...settings.metronome, ...updates },
+              });
+            }}
           />
           <Settings
             settings={settings}
@@ -296,6 +338,7 @@ export default function Index() {
                   onAccept={handleAccept}
                   onDecline={handleDecline}
                   isCompleted={currentScale.completed}
+                  fingerPatterns={settings.fingerPatterns}
                 />
               ) : null}
             </div>

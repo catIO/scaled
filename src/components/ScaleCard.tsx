@@ -10,6 +10,7 @@ interface ScaleCardProps {
   onAccept: () => void;
   onDecline: () => void;
   isCompleted: boolean;
+  fingerPatterns?: string[];
 }
 
 export function ScaleCard({
@@ -19,14 +20,17 @@ export function ScaleCard({
   onAccept,
   onDecline,
   isCompleted,
+  fingerPatterns,
 }: ScaleCardProps) {
   // Generate a new random finger combination each time the scale is displayed
-  const [fingerCombination, setFingerCombination] = useState(() => getRandomFingerCombination());
+  const [fingerCombination, setFingerCombination] = useState<string | null>(() => 
+    getRandomFingerCombination(scaleName, fingerPatterns)
+  );
 
-  // Update finger combination when scale name changes
+  // Update finger combination when scale name or patterns change
   useEffect(() => {
-    setFingerCombination(getRandomFingerCombination());
-  }, [scaleName]);
+    setFingerCombination(getRandomFingerCombination(scaleName, fingerPatterns));
+  }, [scaleName, fingerPatterns]);
 
   return (
     <div className="w-full max-w-md animate-scale-in">
@@ -42,9 +46,11 @@ export function ScaleCard({
           <h2 className="text-4xl font-bold text-card-foreground">
             {scaleName}
           </h2>
-          <p className="text-base text-muted-foreground text-lg pb-0">
-            {fingerCombination}
-          </p>
+          {fingerCombination && (
+            <p className="text-lg text-muted-foreground font-medium pb-0">
+              {fingerCombination}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-center gap-2 py-4 pt-2">
