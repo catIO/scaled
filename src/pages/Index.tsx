@@ -14,6 +14,7 @@ import {
   ScaleProgress,
   DEFAULT_SETTINGS,
 } from '@/types/practice';
+import { getNextFingerCombination } from '@/lib/fingerCombinations';
 
 // Shuffle array using Fisher-Yates
 function shuffleArray<T>(array: T[]): T[] {
@@ -100,6 +101,10 @@ export default function Index() {
   // Track pending navigation to prevent race conditions
   const pendingNavigationRef = useRef<number | null>(null);
 
+  // Track recently used finger patterns so we avoid too many duplicates per iteration
+  const recentFingerPatternsRef = useRef<string[]>([]);
+  const [chosenFingerPattern, setChosenFingerPattern] = useState<string | null>(null);
+
   // Track previous scales to detect actual changes
   const prevScalesRef = useRef<string[]>(settings.scales);
 
@@ -141,6 +146,26 @@ export default function Index() {
   const currentOrderIndex = practiceState.practiceOrder[practiceState.currentScaleIndex];
   const currentScale = practiceState.scaleProgress[currentOrderIndex];
 
+  // Pick next finger combination when scale or patterns change; avoid recently used
+  useEffect(() => {
+    if (!currentScale?.name) {
+      setChosenFingerPattern(null);
+      return;
+    }
+    const patterns = settings.fingerPatterns;
+    if (!patterns?.length) {
+      setChosenFingerPattern(null);
+      return;
+    }
+    const result = getNextFingerCombination(patterns, recentFingerPatternsRef.current);
+    if (result) {
+      setChosenFingerPattern(result.pattern);
+      recentFingerPatternsRef.current = result.newRecent;
+    } else {
+      setChosenFingerPattern(null);
+    }
+  }, [currentScale?.name, settings.fingerPatterns]);
+
   const allCompleted = useMemo(
     () => practiceState.scaleProgress.every((s) => s.completed),
     [practiceState.scaleProgress]
@@ -175,7 +200,19 @@ export default function Index() {
         attempts++;
       }
 
-      return { ...prev, currentScaleIndex: nextIndex };
+      // New iteration = wrapping back to start; use a different order for this round
+      const newOrder =
+        nextIndex === 0
+          ? shuffleArray(
+              Array.from({ length: prev.practiceOrder.length }, (_, i) => i)
+            )
+          : prev.practiceOrder;
+
+      return {
+        ...prev,
+        practiceOrder: newOrder,
+        currentScaleIndex: nextIndex,
+      };
     });
   }, [setPracticeState]);
 
@@ -221,6 +258,7 @@ export default function Index() {
   }, [moveToNextScale]);
 
   const handleReset = useCallback(() => {
+    recentFingerPatternsRef.current = [];
     setPracticeState(initializePracticeState(settings));
   }, [settings, setPracticeState]);
 
@@ -338,6 +376,7 @@ export default function Index() {
                   onAccept={handleAccept}
                   onDecline={handleDecline}
                   isCompleted={currentScale.completed}
+                  fingerCombination={chosenFingerPattern}
                   fingerPatterns={settings.fingerPatterns}
                 />
               ) : null}

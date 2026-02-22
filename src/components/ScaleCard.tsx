@@ -10,6 +10,8 @@ interface ScaleCardProps {
   onAccept: () => void;
   onDecline: () => void;
   isCompleted: boolean;
+  /** When provided, this pattern is shown; otherwise a random one is chosen from fingerPatterns */
+  fingerCombination?: string | null;
   fingerPatterns?: string[];
 }
 
@@ -20,17 +22,21 @@ export function ScaleCard({
   onAccept,
   onDecline,
   isCompleted,
+  fingerCombination: fingerCombinationProp,
   fingerPatterns,
 }: ScaleCardProps) {
-  // Generate a new random finger combination each time the scale is displayed
-  const [fingerCombination, setFingerCombination] = useState<string | null>(() => 
-    getRandomFingerCombination(scaleName, fingerPatterns)
+  const [localFingerCombination, setLocalFingerCombination] = useState<string | null>(
+    () => getRandomFingerCombination(scaleName, fingerPatterns)
   );
 
-  // Update finger combination when scale name or patterns change
+  // When parent doesn't control finger combination, update local when scale or patterns change
   useEffect(() => {
-    setFingerCombination(getRandomFingerCombination(scaleName, fingerPatterns));
-  }, [scaleName, fingerPatterns]);
+    if (fingerCombinationProp !== undefined) return;
+    setLocalFingerCombination(getRandomFingerCombination(scaleName, fingerPatterns));
+  }, [scaleName, fingerPatterns, fingerCombinationProp]);
+
+  const fingerCombination =
+    fingerCombinationProp !== undefined ? fingerCombinationProp : localFingerCombination;
 
   return (
     <div className="w-full max-w-md animate-scale-in">
