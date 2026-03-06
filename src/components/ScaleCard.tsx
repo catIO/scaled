@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { MdCheck, MdClose, MdMusicNote } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
 import { getRandomFingerCombination } from '@/lib/fingerCombinations';
+import { SCALE_DICTIONARY, getBaseScaleName, getOctaveCount, generateMultiOctaveABC } from '@/lib/notation';
+import { ScaleNotationModal } from '@/components/ScaleNotationModal';
 
 interface ScaleCardProps {
   scaleName: string;
@@ -28,6 +30,15 @@ export function ScaleCard({
   const [localFingerCombination, setLocalFingerCombination] = useState<string | null>(
     () => getRandomFingerCombination(scaleName, fingerPatterns)
   );
+  const [showNotation, setShowNotation] = useState(false);
+
+  const baseName = getBaseScaleName(scaleName);
+  const octaves = getOctaveCount(scaleName);
+  const baseDef = SCALE_DICTIONARY[baseName];
+  const notation = baseDef ? {
+    name: scaleName,
+    abc: generateMultiOctaveABC(baseDef, octaves)
+  } : null;
 
   // When parent doesn't control finger combination, update local when scale or patterns change
   useEffect(() => {
@@ -41,16 +52,26 @@ export function ScaleCard({
   return (
     <div className="w-full max-w-md animate-scale-in">
       <div className="bg-muted rounded-2xl material-shadow-xl p-8 text-center space-y-6">
-        <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+        <button
+          onClick={() => notation && setShowNotation(true)}
+          disabled={!notation}
+          className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center transition-colors ${notation ? 'bg-primary/10 hover:bg-primary/20 cursor-pointer' : 'bg-primary/10 opacity-50 cursor-not-allowed'}`}
+          aria-label="View Scale Notation"
+        >
           <MdMusicNote className="w-8 h-8 text-primary" />
-        </div>
-        
+        </button>
+
         <div className="space-y-2">
           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
             Practice Scale
           </p>
-          <h2 className="text-4xl font-bold text-card-foreground">
-            {scaleName}
+          <h2 className="text-4xl font-bold text-card-foreground flex flex-col items-center gap-1">
+            <span>{scaleName.split(' - ')[0]}</span>
+            {scaleName.includes(' - ') && (
+              <span className="text-2xl text-muted-foreground font-medium">
+                {scaleName.split(' - ').slice(1).join(' - ')}
+              </span>
+            )}
           </h2>
           {fingerCombination && (
             <p className="text-lg text-muted-foreground font-medium pb-0">
@@ -64,9 +85,8 @@ export function ScaleCard({
             {Array.from({ length: repetitionsRequired }).map((_, i) => (
               <div
                 key={i}
-                className={`w-4 h-4 rounded-full transition-all duration-300 ${
-                  i < successCount ? 'bg-success scale-110' : 'bg-foreground/20'
-                }`}
+                className={`w-4 h-4 rounded-full transition-all duration-300 ${i < successCount ? 'bg-success scale-110' : 'bg-foreground/20'
+                  }`}
               />
             ))}
           </div>
@@ -102,6 +122,13 @@ export function ScaleCard({
             </div>
           </div>
         )}
+
+        <ScaleNotationModal
+          isOpen={showNotation}
+          onClose={() => setShowNotation(false)}
+          scaleName={notation?.name || ''}
+          abcString={notation?.abc || ''}
+        />
       </div>
     </div>
   );

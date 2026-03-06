@@ -25,6 +25,21 @@ import {
   TabsTrigger,
   TabsContent,
 } from '@/components/ui/tabs';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { UNIQUE_SCALE_NAMES } from '@/lib/notation';
 import { PracticeSettings } from '@/types/practice';
 
 const AVAILABLE_FINGER_PATTERNS = ['i-m', 'm-i', 'm-a', 'a-m', 'i-a', 'a-i', 'a-m-i'] as const;
@@ -42,14 +57,20 @@ export function Settings({ settings, onSettingsChange, onReset, open: controlled
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
   const [newScale, setNewScale] = useState('');
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [octaves, setOctaves] = useState('1');
 
   const addScale = () => {
-    if (newScale.trim() && !settings.scales.includes(newScale.trim())) {
-      onSettingsChange({
-        ...settings,
-        scales: [...settings.scales, newScale.trim()],
-      });
-      setNewScale('');
+    if (newScale.trim()) {
+      const scaleNameWithOctaves = `${newScale.trim()} - ${octaves} Octave${octaves === '1' ? '' : 's'}`;
+      if (!settings.scales.includes(scaleNameWithOctaves)) {
+        onSettingsChange({
+          ...settings,
+          scales: [...settings.scales, scaleNameWithOctaves],
+        });
+        setNewScale('');
+        setOctaves('1');
+      }
     }
   };
 
@@ -122,16 +143,78 @@ export function Settings({ settings, onSettingsChange, onReset, open: controlled
 
             <div className="space-y-3">
               <Label className="text-sm font-medium">Scales to Practice</Label>
-              
+
               <div className="flex gap-2">
-                <Input
-                  placeholder="Add new scale..."
-                  value={newScale}
-                  onChange={(e) => setNewScale(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addScale()}
-                  className="flex-1"
-                />
-                <Button onClick={addScale} size="icon" variant="secondary" aria-label="Add scale">
+                <Popover open={comboboxOpen} onOpenChange={setComboboxOpen} modal={true}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={comboboxOpen}
+                      className="flex-1 justify-between font-normal"
+                    >
+                      {newScale || "Select or type scale..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search or type scale..."
+                        onValueChange={(val) => {
+                          // Keep newScale in sync with typing so they can add arbitrary text
+                          setNewScale(val);
+                        }}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="p-2 text-sm text-muted-foreground flex items-center justify-between">
+                            <span>No standard scale found.</span>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => setComboboxOpen(false)}
+                            >
+                              Use "{newScale}"
+                            </Button>
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {UNIQUE_SCALE_NAMES.map((scale) => (
+                            <CommandItem
+                              key={scale}
+                              value={scale}
+                              onSelect={(currentValue) => {
+                                // shadcn command lowercases the value, we should find the original casing
+                                const originalScale = UNIQUE_SCALE_NAMES.find(s => s.toLowerCase() === currentValue.toLowerCase()) || currentValue;
+                                setNewScale(originalScale);
+                                setComboboxOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${newScale === scale ? "opacity-100" : "opacity-0"}`}
+                              />
+                              {scale}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                <Select value={octaves} onValueChange={setOctaves}>
+                  <SelectTrigger className="w-[110px]">
+                    <SelectValue placeholder="Octaves" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 Octave</SelectItem>
+                    <SelectItem value="2">2 Octaves</SelectItem>
+                    <SelectItem value="3">3 Octaves</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button onClick={addScale} size="icon" variant="secondary" aria-label="Add scale" disabled={!newScale.trim()}>
                   <MdAdd className="w-4 h-4" />
                 </Button>
               </div>
