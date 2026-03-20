@@ -16,10 +16,23 @@ interface ProgressTrackerProps {
 export function ProgressTracker({ scaleProgress, repetitionsRequired, currentScale, onOpenSettings }: ProgressTrackerProps) {
   const [notationScale, setNotationScale] = useState<{ name: string, abc: string } | null>(null);
 
+  const minSuccessCount = scaleProgress.length
+    ? Math.min(...scaleProgress.map((s) => s.successCount))
+    : 0;
+  const setPlays = Math.max(0, Math.min(minSuccessCount, repetitionsRequired));
+  const setProgressPct = repetitionsRequired
+    ? (setPlays / repetitionsRequired) * 100
+    : 0;
+
   return (
     <div className="w-full space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-m font-bold text-muted-foreground uppercase tracking-wider py-2">Progress</h3>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            Set: {setPlays}/{repetitionsRequired}
+          </span>
+        </div>
         {onOpenSettings && (
           <Button
             variant="ghost"
@@ -32,6 +45,16 @@ export function ProgressTracker({ scaleProgress, repetitionsRequired, currentSca
           </Button>
         )}
       </div>
+
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ease-out ${
+            setPlays >= repetitionsRequired ? 'bg-success' : 'bg-primary'
+          }`}
+          style={{ width: `${Math.min(setProgressPct, 100)}%` }}
+        />
+      </div>
+
       <div className="grid gap-2 overflow-y-auto pr-2">
         {scaleProgress.map((scale) => {
           const progress = (scale.successCount / repetitionsRequired) * 100;

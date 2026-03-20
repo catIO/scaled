@@ -187,31 +187,44 @@ export default function Index() {
 
   const moveToNextScale = useCallback(() => {
     setPracticeState((prev) => {
-      // Find next incomplete scale
-      let nextIndex = (prev.currentScaleIndex + 1) % prev.practiceOrder.length;
-      let attempts = 0;
+      const total = prev.practiceOrder.length;
 
-      while (attempts < prev.practiceOrder.length) {
-        const scaleIndex = prev.practiceOrder[nextIndex];
+      // Advance forward through the current round exactly once.
+      // This prevents re-visiting earlier scales before every scale in the round
+      // has had its chance to be shown.
+      let nextPos = prev.currentScaleIndex + 1;
+      while (nextPos < total) {
+        const scaleIndex = prev.practiceOrder[nextPos];
         if (!prev.scaleProgress[scaleIndex]?.completed) {
-          break;
+          return { ...prev, currentScaleIndex: nextPos };
         }
-        nextIndex = (nextIndex + 1) % prev.practiceOrder.length;
-        attempts++;
+        nextPos++;
       }
 
-      // New iteration = wrapping back to start; use a different order for this round
-      const newOrder =
-        nextIndex === 0
-          ? shuffleArray(
-              Array.from({ length: prev.practiceOrder.length }, (_, i) => i)
-            )
-          : prev.practiceOrder;
+      // End of round: start a new iteration with a fresh order.
+      const newPracticeOrder = shuffleArray(
+        Array.from({ length: total }, (_, i) => i)
+      );
 
+      // Jump to the first incomplete scale in the new round.
+      let firstIncompletePos = 0;
+      while (firstIncompletePos < total) {
+        const scaleIndex = newPracticeOrder[firstIncompletePos];
+        if (!prev.scaleProgress[scaleIndex]?.completed) {
+          return {
+            ...prev,
+            practiceOrder: newPracticeOrder,
+            currentScaleIndex: firstIncompletePos,
+          };
+        }
+        firstIncompletePos++;
+      }
+
+      // All completed: state values don't really matter because UI switches.
       return {
         ...prev,
-        practiceOrder: newOrder,
-        currentScaleIndex: nextIndex,
+        practiceOrder: newPracticeOrder,
+        currentScaleIndex: 0,
       };
     });
   }, [setPracticeState]);
