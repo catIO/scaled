@@ -2,6 +2,7 @@ import { useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { MdRefresh, MdEmojiEvents } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useMetronome } from '@/hooks/useMetronome';
 import { ScaleCard } from '@/components/ScaleCard';
@@ -173,6 +174,16 @@ export default function Index() {
 
   const completedCount = useMemo(
     () => practiceState.scaleProgress.filter((s) => s.completed).length,
+    [practiceState.scaleProgress]
+  );
+
+  const totalRepetitions = useMemo(
+    () => practiceState.scaleProgress.length * settings.repetitionsRequired,
+    [practiceState.scaleProgress.length, settings.repetitionsRequired]
+  );
+
+  const currentRepetitions = useMemo(
+    () => practiceState.scaleProgress.reduce((acc, s) => acc + s.successCount, 0),
     [practiceState.scaleProgress]
   );
 
@@ -353,9 +364,15 @@ export default function Index() {
               {/* Title */}
               <div className="text-center space-y-2 animate-slide-up">
                 <h1 className="text-3xl font-bold text-foreground">Scaled</h1>
-                <p className="text-muted-foreground">
-                  {completedCount} of {practiceState.scaleProgress.length} scales completed
-                </p>
+                <div className="w-64 mx-auto space-y-2 mt-2">
+                  <Progress
+                    value={(currentRepetitions / totalRepetitions) * 100}
+                    className="h-1.5 bg-secondary"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {currentRepetitions} of {totalRepetitions} scales completed
+                  </p>
+                </div>
               </div>
 
               {/* Current Scale Card or Completion */}
