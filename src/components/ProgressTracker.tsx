@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { ScaleProgress } from '@/types/practice';
 import { MdEdit, MdMusicNote } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { SCALE_DICTIONARY, getBaseScaleName, getOctaveCount, generateMultiOctaveABC } from '@/lib/notation';
-import { ScaleNotationModal } from '@/components/ScaleNotationModal';
+
+const ScaleNotationModal = lazy(() =>
+  import('@/components/ScaleNotationModal').then((module) => ({ default: module.ScaleNotationModal }))
+);
 
 interface ProgressTrackerProps {
   scaleProgress: ScaleProgress[];
@@ -112,12 +115,16 @@ export function ProgressTracker({ scaleProgress, repetitionsRequired, currentSca
           );
         })}
       </div>
-      <ScaleNotationModal
-        isOpen={!!notationScale}
-        onClose={() => setNotationScale(null)}
-        scaleName={notationScale?.name || ''}
-        abcString={notationScale?.abc || ''}
-      />
+      {notationScale && (
+        <Suspense fallback={null}>
+          <ScaleNotationModal
+            isOpen={!!notationScale}
+            onClose={() => setNotationScale(null)}
+            scaleName={notationScale?.name || ''}
+            abcString={notationScale?.abc || ''}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

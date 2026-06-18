@@ -9,6 +9,7 @@ export interface MetronomeSettings {
   bpm: number;
   volume: number;
   tone: 'low' | 'medium' | 'high';
+  subdivision: 1 | 2 | 3 | 4;
 }
 
 export interface PracticeSettings {
@@ -40,6 +41,7 @@ export const DEFAULT_SETTINGS: PracticeSettings = {
     bpm: 80,
     volume: 70,
     tone: 'medium',
+    subdivision: 1,
   },
   fingerPatterns: [],
 };

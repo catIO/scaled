@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { MdCheck, MdClose, MdMusicNote } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
 import { getRandomFingerCombination } from '@/lib/fingerCombinations';
 import { SCALE_DICTIONARY, getBaseScaleName, getOctaveCount, generateMultiOctaveABC } from '@/lib/notation';
-import { ScaleNotationModal } from '@/components/ScaleNotationModal';
+
+const ScaleNotationModal = lazy(() =>
+  import('@/components/ScaleNotationModal').then((module) => ({ default: module.ScaleNotationModal }))
+);
 
 interface ScaleCardProps {
   scaleName: string;
@@ -12,6 +15,7 @@ interface ScaleCardProps {
   onAccept: () => void;
   onDecline: () => void;
   isCompleted: boolean;
+  acceptDisabled?: boolean;
   /** When provided, this pattern is shown; otherwise a random one is chosen from fingerPatterns */
   fingerCombination?: string | null;
   fingerPatterns?: string[];
@@ -24,6 +28,7 @@ export function ScaleCard({
   onAccept,
   onDecline,
   isCompleted,
+  acceptDisabled = false,
   fingerCombination: fingerCombinationProp,
   fingerPatterns,
 }: ScaleCardProps) {
@@ -106,6 +111,7 @@ export function ScaleCard({
             </Button>
             <Button
               onClick={onAccept}
+              disabled={acceptDisabled}
               aria-label="Mark scale as completed"
               className="w-16 h-16 rounded-xl bg-success text-white hover:bg-success/90 [&_svg]:!w-8 [&_svg]:!h-8"
             >
@@ -123,12 +129,16 @@ export function ScaleCard({
           </div>
         )}
 
-        <ScaleNotationModal
-          isOpen={showNotation}
-          onClose={() => setShowNotation(false)}
-          scaleName={notation?.name || ''}
-          abcString={notation?.abc || ''}
-        />
+        {showNotation && (
+          <Suspense fallback={null}>
+            <ScaleNotationModal
+              isOpen={showNotation}
+              onClose={() => setShowNotation(false)}
+              scaleName={notation?.name || ''}
+              abcString={notation?.abc || ''}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   );

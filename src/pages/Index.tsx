@@ -45,6 +45,8 @@ function initializePracticeState(settings: PracticeSettings): PracticeState {
   };
 }
 
+const ACCEPT_COOLDOWN_MS = 900;
+
 export default function Index() {
   const [rawSettings, setRawSettings] = useLocalStorage<PracticeSettings>(
     'scale-practice-settings',
@@ -53,12 +55,15 @@ export default function Index() {
 
   // Migrate old settings and ensure fingerPatterns is properly initialized
   const settings = useMemo(() => {
-    const migrated = { ...rawSettings };
+    const migrated: PracticeSettings & { fingerCombinations?: unknown } = {
+      ...rawSettings,
+    };
     let needsUpdate = false;
+    const validSubdivisions = [1, 2, 3, 4];
     
     // Remove old fingerCombinations property if it exists
     if ('fingerCombinations' in migrated) {
-      delete (migrated as any).fingerCombinations;
+      delete migrated.fingerCombinations;
       needsUpdate = true;
     }
     
@@ -75,6 +80,28 @@ export default function Index() {
       );
       if (filtered.length !== migrated.fingerPatterns.length) {
         migrated.fingerPatterns = filtered;
+        needsUpdate = true;
+      }
+    }
+
+    // Ensure metronome settings have all current fields and valid ranges
+    if (!migrated.metronome) {
+      migrated.metronome = { ...DEFAULT_SETTINGS.metronome };
+      needsUpdate = true;
+    } else {
+      if (!Number.isFinite(migrated.metronome.bpm)) {
+        migrated.metronome.bpm = DEFAULT_SETTINGS.metronome.bpm;
+        needsUpdate = true;
+      } else {
+        const clampedBpm = Math.min(300, Math.max(30, migrated.metronome.bpm));
+        if (clampedBpm !== migrated.metronome.bpm) {
+          migrated.metronome.bpm = clampedBpm;
+          needsUpdate = true;
+        }
+      }
+
+      if (!validSubdivisions.includes(migrated.metronome.subdivision as 1 | 2 | 3 | 4)) {
+        migrated.metronome.subdivision = 1;
         needsUpdate = true;
       }
     }
@@ -98,9 +125,13 @@ export default function Index() {
 
   const { isPlaying, toggle } = useMetronome(settings.metronome);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isAcceptPending, setIsAcceptPending] = useState(false);
   
   // Track pending navigation to prevent race conditions
   const pendingNavigationRef = useRef<number | null>(null);
+  const acceptInProgressRef = useRef(false);
+  const acceptUnlockTimeoutRef = useRef<number | null>(null);
+  const lastAcceptAtRef = useRef(0);
 
   // Track recently used finger patterns so we avoid too many duplicates per iteration
   const recentFingerPatternsRef = useRef<string[]>([]);
@@ -241,11 +272,16 @@ export default function Index() {
   }, [setPracticeState]);
 
   const handleAccept = useCallback(() => {
-    // Clear any pending navigation to prevent race conditions
-    if (pendingNavigationRef.current !== null) {
-      clearTimeout(pendingNavigationRef.current);
-      pendingNavigationRef.current = null;
-    }
+    // Ignore repeated clicks while handling the current successful attempt.
+    if (acceptInProgressRef.current) return;
+
+    const now = Date.now();
+    if (now - lastAcceptAtRef.current < ACCEPT_COOLDOWN_MS) return;
+
+    acceptInProgressRef.current = true;
+    setIsAcceptPending(true);
+
+    let didAccept = false;
 
     setPracticeState((prev) => {
       const orderIndex = prev.practiceOrder[prev.currentScaleIndex];
@@ -253,6 +289,8 @@ export default function Index() {
       const scale = newProgress[orderIndex];
       
       if (!scale || scale.completed) return prev;
+
+      didAccept = true;
 
       const newCount = scale.successCount + 1;
       const isNowCompleted = newCount >= settings.repetitionsRequired;
@@ -270,10 +308,31 @@ export default function Index() {
       return { ...prev, scaleProgress: newProgress };
     });
 
+    if (!didAccept) {
+      acceptInProgressRef.current = false;
+      setIsAcceptPending(false);
+      return;
+    }
+
+    lastAcceptAtRef.current = Date.now();
+
     // Move to next after a brief delay
     pendingNavigationRef.current = window.setTimeout(() => {
       moveToNextScale();
       pendingNavigationRef.current = null;
+
+      const elapsed = Date.now() - lastAcceptAtRef.current;
+      const remainingLock = Math.max(0, ACCEPT_COOLDOWN_MS - elapsed);
+
+      if (acceptUnlockTimeoutRef.current !== null) {
+        clearTimeout(acceptUnlockTimeoutRef.current);
+      }
+
+      acceptUnlockTimeoutRef.current = window.setTimeout(() => {
+        acceptInProgressRef.current = false;
+        setIsAcceptPending(false);
+        acceptUnlockTimeoutRef.current = null;
+      }, remainingLock);
     }, 500);
   }, [settings.repetitionsRequired, fireConfetti, moveToNextScale, setPracticeState]);
 
@@ -298,6 +357,9 @@ export default function Index() {
     return () => {
       if (pendingNavigationRef.current !== null) {
         clearTimeout(pendingNavigationRef.current);
+      }
+      if (acceptUnlockTimeoutRef.current !== null) {
+        clearTimeout(acceptUnlockTimeoutRef.current);
       }
     };
   }, []);
@@ -406,6 +468,7 @@ export default function Index() {
                   onAccept={handleAccept}
                   onDecline={handleDecline}
                   isCompleted={currentScale.completed}
+                  acceptDisabled={isAcceptPending}
                   fingerCombination={chosenFingerPattern}
                   fingerPatterns={settings.fingerPatterns}
                 />

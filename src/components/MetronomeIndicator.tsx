@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MdPlayArrow, MdPause, MdKeyboardArrowDown, MdRemove, MdAdd } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -25,6 +26,13 @@ interface MetronomeIndicatorProps {
   onSettingsChange: (updates: Partial<MetronomeSettings>) => void;
 }
 
+const MIN_BPM = 30;
+const MAX_BPM = 300;
+
+function clampBpm(value: number) {
+  return Math.min(MAX_BPM, Math.max(MIN_BPM, value));
+}
+
 export function MetronomeIndicator({ 
   settings, 
   isPlaying, 
@@ -32,12 +40,21 @@ export function MetronomeIndicator({
   onSettingsChange 
 }: MetronomeIndicatorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [bpmInput, setBpmInput] = useState(String(settings.bpm));
   const widgetRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
+  useEffect(() => {
+    setBpmInput(String(settings.bpm));
+  }, [settings.bpm]);
+
+  // Close dropdown when clicking outside, but ignore clicks inside Radix portals
+  // (Select/Popover content renders in a portal outside widgetRef)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (widgetRef.current && !widgetRef.current.contains(event.target as Node)) {
+      const target = event.target as Element;
+      // Ignore clicks inside any Radix popper portal (Select dropdowns, etc.)
+      if (target.closest('[data-radix-popper-content-wrapper]')) return;
+      if (widgetRef.current && !widgetRef.current.contains(target)) {
         setIsOpen(false);
       }
     };
@@ -69,15 +86,24 @@ export function MetronomeIndicator({
   }, [isOpen]);
 
   const handleBpmDecrease = () => {
-    if (settings.bpm > 40) {
-      onSettingsChange({ bpm: Math.max(40, settings.bpm - 5) });
+    if (settings.bpm > MIN_BPM) {
+      onSettingsChange({ bpm: clampBpm(settings.bpm - 5) });
     }
   };
 
   const handleBpmIncrease = () => {
-    if (settings.bpm < 200) {
-      onSettingsChange({ bpm: Math.min(200, settings.bpm + 5) });
+    if (settings.bpm < MAX_BPM) {
+      onSettingsChange({ bpm: clampBpm(settings.bpm + 5) });
     }
+  };
+
+  const commitBpmInput = () => {
+    const parsed = Number.parseInt(bpmInput, 10);
+    if (!Number.isFinite(parsed)) {
+      setBpmInput(String(settings.bpm));
+      return;
+    }
+    onSettingsChange({ bpm: clampBpm(parsed) });
   };
 
   const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -153,8 +179,25 @@ export function MetronomeIndicator({
           {/* BPM Control */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-3">
-              <Label className="text-sm font-medium">BPM</Label>
-              <span className="text-lg font-bold">{settings.bpm}</span>
+              <Label htmlFor="bpm-input" className="text-sm font-medium">BPM</Label>
+              <Input
+                id="bpm-input"
+                type="number"
+                inputMode="numeric"
+                min={MIN_BPM}
+                max={MAX_BPM}
+                step={5}
+                value={bpmInput}
+                onChange={(e) => setBpmInput(e.target.value)}
+                onBlur={commitBpmInput}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    commitBpmInput();
+                  }
+                }}
+                className="w-24 h-8 text-center font-semibold"
+                aria-label="Set BPM"
+              />
             </div>
             <div className="flex items-center gap-3">
               <Button
@@ -162,16 +205,17 @@ export function MetronomeIndicator({
                 size="icon"
                 className="h-10 w-10 flex-shrink-0"
                 onClick={handleBpmDecrease}
-                disabled={settings.bpm <= 40}
+                disabled={settings.bpm <= MIN_BPM}
+                aria-label="Decrease BPM by 5"
               >
                 <MdRemove className="w-4 h-4" />
               </Button>
               <Slider
                 value={[settings.bpm]}
                 onValueChange={([bpm]) => onSettingsChange({ bpm })}
-                min={40}
-                max={200}
-                step={1}
+                min={MIN_BPM}
+                max={MAX_BPM}
+                step={5}
                 className="flex-1"
               />
               <Button
@@ -179,11 +223,34 @@ export function MetronomeIndicator({
                 size="icon"
                 className="h-10 w-10 flex-shrink-0"
                 onClick={handleBpmIncrease}
-                disabled={settings.bpm >= 200}
+                disabled={settings.bpm >= MAX_BPM}
+                aria-label="Increase BPM by 5"
               >
                 <MdAdd className="w-4 h-4" />
               </Button>
             </div>
+          </div>
+
+          {/* Subdivision Selector */}
+          <div className="mb-4">
+            <Label className="text-sm font-medium mb-2 block">Subdivision</Label>
+            <Select
+              value={String(settings.subdivision || 1)}
+              onValueChange={(subdivision) => {
+                const subdiv = Number(subdivision) as MetronomeSettings['subdivision'];
+                onSettingsChange({ subdivision: subdiv });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 per beat</SelectItem>
+                <SelectItem value="2">2 per beat</SelectItem>
+                <SelectItem value="3">3 per beat</SelectItem>
+                <SelectItem value="4">4 per beat</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Volume Control */}

@@ -1,5 +1,4 @@
 import { useEffect, useState, useId } from 'react';
-import abcjs from 'abcjs';
 import {
     Dialog,
     DialogContent,
@@ -28,24 +27,26 @@ export function ScaleNotationModal({ isOpen, onClose, scaleName, abcString }: Sc
     }, [isOpen]);
 
     useEffect(() => {
-        let renderTimeout: NodeJS.Timeout;
+        let renderTimeout: ReturnType<typeof setTimeout>;
 
         if (isOpen && abcString) {
             const render = () => {
                 const el = document.getElementById(containerId);
                 if (!el) return;
 
-                try {
-                    const renderFn = abcjs.renderAbc || (abcjs as any).default?.renderAbc;
-                    if (typeof renderFn === 'function') {
-                        renderFn(containerId, abcString, {
-                            responsive: 'resize',
-                            scale: isExpanded ? 1.5 : 1
-                        });
-                    }
-                } catch (e) {
-                    console.error("Error rendering ABC notation:", e);
-                }
+                import('abcjs')
+                    .then((abcjs) => {
+                        const renderFn = abcjs.renderAbc;
+                        if (typeof renderFn === 'function') {
+                            renderFn(containerId, abcString, {
+                                responsive: 'resize',
+                                scale: isExpanded ? 1.5 : 1
+                            });
+                        }
+                    })
+                    .catch((e) => {
+                        console.error("Error loading ABCJS notation renderer:", e);
+                    });
             };
 
             // Wait for dialog to mount
