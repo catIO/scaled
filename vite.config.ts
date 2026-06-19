@@ -10,72 +10,13 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
-  build: {
-    chunkSizeWarningLimit: 550,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
 
-          if (
-            id.includes("/react/") ||
-            id.includes("/react-dom/") ||
-            id.includes("/scheduler/")
-          ) {
-            return "vendor-react";
-          }
-
-          if (id.includes("react-router") || id.includes("@remix-run")) {
-            return "vendor-router";
-          }
-
-          if (id.includes("@radix-ui")) {
-            return "vendor-radix";
-          }
-
-          if (id.includes("react-icons") || id.includes("lucide-react")) {
-            return "vendor-icons";
-          }
-
-          if (id.includes("@tanstack/react-query")) {
-            return "vendor-query";
-          }
-
-          if (id.includes("abcjs")) {
-            return "vendor-notation";
-          }
-
-          if (id.includes("canvas-confetti")) {
-            return "vendor-effects";
-          }
-
-          if (
-            id.includes("next-themes") ||
-            id.includes("sonner") ||
-            id.includes("cmdk") ||
-            id.includes("input-otp") ||
-            id.includes("react-day-picker") ||
-            id.includes("date-fns") ||
-            id.includes("embla-carousel-react") ||
-            id.includes("vaul") ||
-            id.includes("react-hook-form") ||
-            id.includes("@hookform/resolvers") ||
-            id.includes("zod")
-          ) {
-            return "vendor-ui-tools";
-          }
-
-          return "vendor-misc";
-        },
-      },
-    },
-  },
   plugins: [
     react(),
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      injectRegister: false,
+      injectRegister: "script",
       devOptions: {
         enabled: false,
         type: "module",
@@ -156,5 +97,6 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    dedupe: ["react", "react-dom"],
   },
 }));
