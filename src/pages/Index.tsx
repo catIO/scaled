@@ -352,6 +352,15 @@ export default function Index() {
     [setRawSettings]
   );
 
+  const handleImport = useCallback(
+    (importedSettings: PracticeSettings, importedState: PracticeState) => {
+      prevScalesRef.current = importedSettings.scales;
+      setRawSettings(importedSettings);
+      setPracticeState(importedState);
+    },
+    [setRawSettings, setPracticeState]
+  );
+
   // Cleanup pending navigation on unmount
   useEffect(() => {
     return () => {
@@ -415,6 +424,8 @@ export default function Index() {
             onReset={handleReset}
             open={settingsOpen}
             onOpenChange={setSettingsOpen}
+            practiceState={practiceState}
+            onImport={handleImport}
           />
         </div>
 

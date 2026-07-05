@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { MdSettings, MdAdd, MdDelete } from 'react-icons/md';
+import { useState, useRef } from 'react';
+import { MdSettings, MdAdd, MdDelete, MdFileUpload, MdFileDownload } from 'react-icons/md';
+import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,9 +41,49 @@ import {
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { UNIQUE_SCALE_NAMES } from '@/lib/notation';
-import { PracticeSettings } from '@/types/practice';
+import { PracticeSettings, PracticeState } from '@/types/practice';
 
 const AVAILABLE_FINGER_PATTERNS = ['i-m', 'm-i', 'm-a', 'a-m', 'i-a', 'a-i', 'a-m-i'] as const;
+
+// Helper function to check if imported file is valid
+const isValidBackup = (data: any): data is { settings: PracticeSettings; practiceState: PracticeState } => {
+  if (!data || typeof data !== 'object') return false;
+
+  const { settings, practiceState } = data;
+  if (!settings || typeof settings !== 'object') return false;
+  if (!practiceState || typeof practiceState !== 'object') return false;
+
+  // Validate settings
+  if (!Array.isArray(settings.scales)) return false;
+  if (!settings.scales.every((s: any) => typeof s === 'string')) return false;
+  if (typeof settings.repetitionsRequired !== 'number' || settings.repetitionsRequired < 1) return false;
+  
+  if (!settings.metronome || typeof settings.metronome !== 'object') return false;
+  if (typeof settings.metronome.enabled !== 'boolean') return false;
+  if (typeof settings.metronome.bpm !== 'number' || settings.metronome.bpm < 30 || settings.metronome.bpm > 300) return false;
+  if (typeof settings.metronome.volume !== 'number' || settings.metronome.volume < 0 || settings.metronome.volume > 100) return false;
+  if (!['low', 'medium', 'high'].includes(settings.metronome.tone)) return false;
+  if (![1, 2, 3, 4].includes(settings.metronome.subdivision)) return false;
+
+  if (settings.fingerPatterns !== undefined) {
+    if (!Array.isArray(settings.fingerPatterns)) return false;
+    if (!settings.fingerPatterns.every((p: any) => typeof p === 'string')) return false;
+  }
+
+  // Validate practiceState
+  if (typeof practiceState.currentScaleIndex !== 'number' || practiceState.currentScaleIndex < 0) return false;
+  if (!Array.isArray(practiceState.scaleProgress)) return false;
+  for (const progress of practiceState.scaleProgress) {
+    if (!progress || typeof progress !== 'object') return false;
+    if (typeof progress.name !== 'string') return false;
+    if (typeof progress.successCount !== 'number' || progress.successCount < 0) return false;
+    if (typeof progress.completed !== 'boolean') return false;
+  }
+  if (!Array.isArray(practiceState.practiceOrder)) return false;
+  if (!practiceState.practiceOrder.every((idx: any) => typeof idx === 'number')) return false;
+
+  return true;
+};
 
 interface SettingsProps {
   settings: PracticeSettings;
@@ -50,15 +91,144 @@ interface SettingsProps {
   onReset: () => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  practiceState: PracticeState;
+  onImport: (settings: PracticeSettings, state: PracticeState) => void;
 }
 
-export function Settings({ settings, onSettingsChange, onReset, open: controlledOpen, onOpenChange }: SettingsProps) {
+export function Settings({
+  settings,
+  onSettingsChange,
+  onReset,
+  open: controlledOpen,
+  onOpenChange,
+  practiceState,
+  onImport,
+}: SettingsProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
   const [newScale, setNewScale] = useState('');
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [octaves, setOctaves] = useState('1');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    try {
+      const exportData = {
+        version: 1,
+        settings,
+        practiceState,
+      };
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.download = `scaled-backup-${dateStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Export Success",
+        description: "Your practice settings and progress have been downloaded.",
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Export Failed",
+        description: "Could not export your data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result;
+        if (typeof text !== 'string') return;
+        const json = JSON.parse(text);
+        
+        if (isValidBackup(json)) {
+          const { settings: importedSettings, practiceState: importedState } = json;
+          
+          // Fallback check for finger patterns if undefined
+          if (!importedSettings.fingerPatterns) {
+            importedSettings.fingerPatterns = [];
+          }
+
+          // Integrity check: match scales and progress elements
+          const scaleNames = importedSettings.scales;
+          const progressNames = importedState.scaleProgress.map((p) => p.name);
+          
+          // Verify identical scales set
+          const match = scaleNames.length === progressNames.length && 
+            scaleNames.every((name) => progressNames.includes(name));
+            
+          if (!match) {
+            toast({
+              title: "Import Error",
+              description: "The scales list in settings does not match the progress data.",
+              variant: "destructive",
+            });
+            return;
+          }
+
+          // Ensure practiceOrder is within valid range of scales
+          const maxScaleIndex = scaleNames.length;
+          const invalidOrderIdx = importedState.practiceOrder.some(
+            (idx) => idx < 0 || idx >= maxScaleIndex
+          );
+
+          if (invalidOrderIdx) {
+            toast({
+              title: "Import Error",
+              description: "The practice order contains invalid indices.",
+              variant: "destructive",
+            });
+            return;
+          }
+
+          onImport(importedSettings, importedState);
+          setOpen(false);
+          
+          toast({
+            title: "Import Success",
+            description: "Practice settings and progress restored successfully.",
+          });
+        } else {
+          toast({
+            title: "Invalid File Format",
+            description: "The selected file is not a valid Scaled backup file.",
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        console.error(err);
+        toast({
+          title: "Import Failed",
+          description: "Failed to read or parse the selected file.",
+          variant: "destructive",
+        });
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const addScale = () => {
     if (newScale.trim()) {
@@ -283,18 +453,54 @@ export function Settings({ settings, onSettingsChange, onReset, open: controlled
           </TabsContent>
         </Tabs>
 
-        {/* Reset Button */}
-        <div className="pt-4 border-t">
+        {/* Data Management Section */}
+        <div className="pt-4 border-t space-y-4">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-foreground">Data Management</h3>
+            <p className="text-xs text-muted-foreground">
+              Backup your settings and progress or restore them from a previous backup.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              className="flex items-center justify-center gap-2 h-10 rounded-lg"
+            >
+              <MdFileDownload className="w-4 h-4" />
+              Export Data
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleImportClick}
+              className="flex items-center justify-center gap-2 h-10 rounded-lg"
+            >
+              <MdFileUpload className="w-4 h-4" />
+              Import Data
+            </Button>
+          </div>
+
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={() => {
-              onReset();
-              setOpen(false);
+              if (window.confirm("Are you sure you want to reset all progress? This will reset all current session practice scores and shufflings. This action cannot be undone.")) {
+                onReset();
+                setOpen(false);
+              }
             }}
-            className="w-full"
+            className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive h-10 rounded-lg font-medium"
           >
             Reset All Progress
           </Button>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportFile}
+            accept=".json"
+            className="hidden"
+          />
         </div>
       </DialogContent>
     </Dialog>
