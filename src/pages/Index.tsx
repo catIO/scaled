@@ -476,87 +476,87 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background p-4 flex flex-col">
       <div className="flex-1 flex items-center justify-center">
-      {/* Main Container Box */}
-      <div className="w-full max-w-6xl bg-card rounded-2xl border border-border material-shadow-xl relative">
-        {/* Top Left Controls */}
-        <div className="absolute top-4 left-4 flex items-center gap-2 bg-card rounded-2xl p-1 border border-border z-10">
-          <MetronomeIndicator
-            settings={settings.metronome}
-            isPlaying={isPlaying}
-            onToggle={toggle}
-            onSettingsChange={(updates) => {
-              setRawSettings({
-                ...settings,
-                metronome: { ...settings.metronome, ...updates },
-              });
-            }}
-          />
-          <Settings
-            settings={settings}
-            onSettingsChange={handleSettingsChange}
-            onReset={handleReset}
-            open={settingsOpen}
-            onOpenChange={setSettingsOpen}
-            practiceState={practiceState}
-            onImport={handleImport}
-            initialTab={settingsInitialTab}
-          />
-        </div>
+        {/* Main Container Box */}
+        <div className="w-full max-w-6xl bg-card rounded-2xl border border-border material-shadow-xl relative">
+          {/* Top Left Controls */}
+          <div className="absolute top-4 left-4 flex items-center gap-2 bg-card rounded-2xl p-1 border border-border z-10">
+            <MetronomeIndicator
+              settings={settings.metronome}
+              isPlaying={isPlaying}
+              onToggle={toggle}
+              onSettingsChange={(updates) => {
+                setRawSettings({
+                  ...settings,
+                  metronome: { ...settings.metronome, ...updates },
+                });
+              }}
+            />
+            <Settings
+              settings={settings}
+              onSettingsChange={handleSettingsChange}
+              onReset={handleReset}
+              open={settingsOpen}
+              onOpenChange={setSettingsOpen}
+              practiceState={practiceState}
+              onImport={handleImport}
+              initialTab={settingsInitialTab}
+            />
+          </div>
 
-        {/* Main Content */}
-        <main className="p-8 pt-20">
-          <div className="grid lg:grid-cols-[1fr,320px] gap-8 items-start">
-            {/* Center Section - Current Scale */}
-            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
-              {/* Title */}
-              <div className="text-center space-y-2 animate-slide-up">
-                <h1 className="text-3xl font-bold text-foreground">Scaled</h1>
-                <div className="w-64 mx-auto space-y-2 mt-2">
-                  <Progress
-                    value={(weeklyCompletedRepetitions / weeklyGoalRepetitions) * 100}
-                    className="h-1.5 bg-secondary"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {todayPaceProgressDisplay} or {dailyTargetDisplay} completed scales towards today's target
-                  </p>
+          {/* Main Content */}
+          <main className="p-8 pt-20">
+            <div className="grid lg:grid-cols-[1fr,320px] gap-8 items-start">
+              {/* Center Section - Current Scale */}
+              <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
+                {/* Title */}
+                <div className="text-center space-y-2 animate-slide-up">
+                  <h1 className="text-3xl font-bold text-foreground">Scaled</h1>
+                  <div className="w-64 mx-auto space-y-2 mt-2">
+                    <Progress
+                      value={(weeklyCompletedRepetitions / weeklyGoalRepetitions) * 100}
+                      className="h-1.5 bg-secondary"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {todayPaceProgressDisplay} or {dailyTargetDisplay} completed scales towards today's target
+                    </p>
+                  </div>
                 </div>
+
+                {/* Current Scale Card */}
+                {currentScale ? (
+                  <ScaleCard
+                    scaleName={currentScale.name}
+                    successCount={currentScale.successCount}
+                    repetitionsRequired={settings.repetitionsRequired}
+                    onAccept={handleAccept}
+                    onDecline={handleDecline}
+                    isCompleted={false}
+                    acceptDisabled={isAcceptPending}
+                    fingerCombination={chosenFingerPattern}
+                    fingerPatterns={settings.fingerPatterns}
+                  />
+                ) : null}
               </div>
 
-              {/* Current Scale Card */}
-              {currentScale ? (
-                <ScaleCard
-                  scaleName={currentScale.name}
-                  successCount={currentScale.successCount}
+              {/* Sidebar - Progress Tracker */}
+              <aside className="lg:sticky lg:top-24 bg-muted/50 rounded-2xl p-6">
+                <ProgressTracker
+                  scaleProgress={practiceState.scaleProgress}
                   repetitionsRequired={settings.repetitionsRequired}
-                  onAccept={handleAccept}
-                  onDecline={handleDecline}
-                  isCompleted={false}
-                  acceptDisabled={isAcceptPending}
-                  fingerCombination={chosenFingerPattern}
-                  fingerPatterns={settings.fingerPatterns}
+                  weeklyGoalRepetitions={weeklyGoalRepetitions}
+                  weeklyCompletedRepetitions={weeklyCompletedRepetitions}
+                  dailyTargetRepetitions={dailyTargetRepetitions}
+                  dailyRemainingRepetitions={dailyRemainingRepetitions}
+                  currentScale={currentScale?.name || ''}
+                  onOpenSettings={() => {
+                    setSettingsInitialTab('scales');
+                    setSettingsOpen(true);
+                  }}
                 />
-              ) : null}
+              </aside>
             </div>
-
-            {/* Sidebar - Progress Tracker */}
-            <aside className="lg:sticky lg:top-24 bg-muted/50 rounded-2xl p-6">
-              <ProgressTracker
-                scaleProgress={practiceState.scaleProgress}
-                repetitionsRequired={settings.repetitionsRequired}
-                weeklyGoalRepetitions={weeklyGoalRepetitions}
-                weeklyCompletedRepetitions={weeklyCompletedRepetitions}
-                dailyTargetRepetitions={dailyTargetRepetitions}
-                dailyRemainingRepetitions={dailyRemainingRepetitions}
-                currentScale={currentScale?.name || ''}
-                onOpenSettings={() => {
-                  setSettingsInitialTab('scales');
-                  setSettingsOpen(true);
-                }}
-              />
-            </aside>
-          </div>
-        </main>
-      </div>
+          </main>
+        </div>
       </div>
 
       <footer className="pt-4 text-xs text-muted-foreground flex items-center justify-center gap-6">
