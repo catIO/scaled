@@ -1,7 +1,6 @@
 import { useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { MdRefresh, MdEmojiEvents } from 'react-icons/md';
-import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import { Progress } from '@/components/ui/progress';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useMetronome } from '@/hooks/useMetronome';
@@ -16,6 +15,41 @@ import {
   DEFAULT_SETTINGS,
 } from '@/types/practice';
 import { getNextFingerCombination } from '@/lib/fingerCombinations';
+
+const WEEKDAY_TO_INDEX: Record<PracticeSettings['weekStartsOn'], number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
+
+function getStartOfDay(date: Date): Date {
+  const day = new Date(date);
+  day.setHours(0, 0, 0, 0);
+  return day;
+}
+
+function getWeekStartDate(date: Date, weekStartsOn: PracticeSettings['weekStartsOn']): Date {
+  const today = getStartOfDay(date);
+  const currentDay = today.getDay();
+  const weekStart = WEEKDAY_TO_INDEX[weekStartsOn];
+  const diff = (currentDay - weekStart + 7) % 7;
+  const start = new Date(today);
+  start.setDate(today.getDate() - diff);
+  return start;
+}
+
+function getWeekKey(date: Date, weekStartsOn: PracticeSettings['weekStartsOn']): string {
+  const weekStart = getWeekStartDate(date, weekStartsOn);
+  return weekStart.toISOString().split('T')[0];
+}
+
+function getDayKey(date: Date): string {
+  return getStartOfDay(date).toISOString().split('T')[0];
+}
 
 // Shuffle array using Fisher-Yates
 function shuffleArray<T>(array: T[]): T[] {
@@ -60,13 +94,13 @@ export default function Index() {
     };
     let needsUpdate = false;
     const validSubdivisions = [1, 2, 3, 4];
-    
+
     // Remove old fingerCombinations property if it exists
     if ('fingerCombinations' in migrated) {
       delete migrated.fingerCombinations;
       needsUpdate = true;
     }
-    
+
     // Ensure fingerPatterns exists and is an array
     // Also clear old format patterns (like 'im', 'ma', 'am') - only keep new format
     const newFormatPatterns = ['i-m', 'm-i', 'm-a', 'a-m', 'i-a', 'a-i', 'a-m-i'];
@@ -75,7 +109,7 @@ export default function Index() {
       needsUpdate = true;
     } else {
       // Filter out old format patterns (2 chars without hyphen) and keep only new format
-      const filtered = migrated.fingerPatterns.filter((p: string) => 
+      const filtered = migrated.fingerPatterns.filter((p: string) =>
         newFormatPatterns.includes(p)
       );
       if (filtered.length !== migrated.fingerPatterns.length) {
@@ -105,12 +139,38 @@ export default function Index() {
         needsUpdate = true;
       }
     }
-    
+
+    // Ensure weekly goal fields exist and remain in valid bounds
+    if (!Number.isFinite(migrated.weeklyGoalRepetitions) || migrated.weeklyGoalRepetitions < 1) {
+      migrated.weeklyGoalRepetitions = Math.max(1, migrated.scales.length * migrated.repetitionsRequired);
+      needsUpdate = true;
+    } else {
+      const clampedWeeklyGoal = Math.max(1, Math.floor(migrated.weeklyGoalRepetitions));
+      if (clampedWeeklyGoal !== migrated.weeklyGoalRepetitions) {
+        migrated.weeklyGoalRepetitions = clampedWeeklyGoal;
+        needsUpdate = true;
+      }
+    }
+
+    const validWeekStartsOn: PracticeSettings['weekStartsOn'][] = [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ];
+    if (!validWeekStartsOn.includes(migrated.weekStartsOn)) {
+      migrated.weekStartsOn = 'monday';
+      needsUpdate = true;
+    }
+
     // If migration was needed, update immediately
     if (needsUpdate) {
       setRawSettings(migrated);
     }
-    
+
     return migrated;
   }, [rawSettings, setRawSettings]);
 
@@ -122,11 +182,20 @@ export default function Index() {
     'scale-practice-state',
     initialPracticeState
   );
+  const [dailyRepetitions, setDailyRepetitions] = useLocalStorage<Record<string, number>>(
+    'scale-practice-daily-repetitions',
+    {}
+  );
+  const [dailyGoalCelebrations, setDailyGoalCelebrations] = useLocalStorage<Record<string, boolean>>(
+    'scale-practice-daily-goal-celebrations',
+    {}
+  );
 
   const { isPlaying, toggle } = useMetronome(settings.metronome);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'scales' | 'goals' | 'fingers'>('scales');
   const [isAcceptPending, setIsAcceptPending] = useState(false);
-  
+
   // Track pending navigation to prevent race conditions
   const pendingNavigationRef = useRef<number | null>(null);
   const acceptInProgressRef = useRef(false);
@@ -144,13 +213,13 @@ export default function Index() {
   useEffect(() => {
     const prevScales = prevScalesRef.current;
     const currentScales = settings.scales;
-    
+
     // Check if scales actually changed
     const scalesChanged = prevScales.length !== currentScales.length ||
       !prevScales.every((s, i) => currentScales[i] === s);
-    
+
     if (!scalesChanged) return;
-    
+
     prevScalesRef.current = currentScales;
 
     setPracticeState((prev) => {
@@ -198,25 +267,24 @@ export default function Index() {
     }
   }, [currentScale?.name, settings.fingerPatterns]);
 
-  const allCompleted = useMemo(
-    () => practiceState.scaleProgress.every((s) => s.completed),
-    [practiceState.scaleProgress]
-  );
-
-  const completedCount = useMemo(
-    () => practiceState.scaleProgress.filter((s) => s.completed).length,
-    [practiceState.scaleProgress]
-  );
-
-  const totalRepetitions = useMemo(
-    () => practiceState.scaleProgress.length * settings.repetitionsRequired,
-    [practiceState.scaleProgress.length, settings.repetitionsRequired]
-  );
-
-  const currentRepetitions = useMemo(
+  const weeklyCompletedRepetitions = useMemo(
     () => practiceState.scaleProgress.reduce((acc, s) => acc + s.successCount, 0),
     [practiceState.scaleProgress]
   );
+
+  const weeklyGoalRepetitions = Math.max(
+    1,
+    settings.scales.length * settings.repetitionsRequired
+  );
+  const dailyTargetRepetitions = weeklyGoalRepetitions / 7;
+  const today = new Date();
+  const todayDayKey = getDayKey(today);
+  const thisWeekKey = getWeekKey(today, settings.weekStartsOn);
+  const todayCompletedRepetitions = dailyRepetitions[todayDayKey] || 0;
+  const dailyRemainingRepetitions = Math.max(0, dailyTargetRepetitions - todayCompletedRepetitions);
+  const dailyTargetDisplay = Math.max(1, Math.ceil(dailyTargetRepetitions));
+  const todayPaceProgressDisplay = Math.min(todayCompletedRepetitions, dailyTargetDisplay);
+  const isOnDailyPace = todayCompletedRepetitions >= dailyTargetRepetitions;
 
   const fireConfetti = useCallback(() => {
     confetti({
@@ -227,42 +295,41 @@ export default function Index() {
     });
   }, []);
 
+  useEffect(() => {
+    const celebrationKey = `${thisWeekKey}:${todayDayKey}`;
+    const alreadyCelebrated = dailyGoalCelebrations[celebrationKey];
+    const reachedDailyPace = todayCompletedRepetitions >= dailyTargetRepetitions;
+
+    if (!alreadyCelebrated && reachedDailyPace) {
+      fireConfetti();
+      setDailyGoalCelebrations((prev) => ({
+        ...prev,
+        [celebrationKey]: true,
+      }));
+    }
+  }, [
+    dailyTargetRepetitions,
+    dailyGoalCelebrations,
+    fireConfetti,
+    setDailyGoalCelebrations,
+    thisWeekKey,
+    todayDayKey,
+    todayCompletedRepetitions,
+  ]);
+
   const moveToNextScale = useCallback(() => {
     setPracticeState((prev) => {
       const total = prev.practiceOrder.length;
 
-      // Advance forward through the current round exactly once.
-      // This prevents re-visiting earlier scales before every scale in the round
-      // has had its chance to be shown.
-      let nextPos = prev.currentScaleIndex + 1;
-      while (nextPos < total) {
-        const scaleIndex = prev.practiceOrder[nextPos];
-        if (!prev.scaleProgress[scaleIndex]?.completed) {
-          return { ...prev, currentScaleIndex: nextPos };
-        }
-        nextPos++;
+      // Continue cycling through all scales, reshuffling each round.
+      const nextPos = prev.currentScaleIndex + 1;
+      if (nextPos < total) {
+        return { ...prev, currentScaleIndex: nextPos };
       }
 
-      // End of round: start a new iteration with a fresh order.
       const newPracticeOrder = shuffleArray(
         Array.from({ length: total }, (_, i) => i)
       );
-
-      // Jump to the first incomplete scale in the new round.
-      let firstIncompletePos = 0;
-      while (firstIncompletePos < total) {
-        const scaleIndex = newPracticeOrder[firstIncompletePos];
-        if (!prev.scaleProgress[scaleIndex]?.completed) {
-          return {
-            ...prev,
-            practiceOrder: newPracticeOrder,
-            currentScaleIndex: firstIncompletePos,
-          };
-        }
-        firstIncompletePos++;
-      }
-
-      // All completed: state values don't really matter because UI switches.
       return {
         ...prev,
         practiceOrder: newPracticeOrder,
@@ -287,8 +354,8 @@ export default function Index() {
       const orderIndex = prev.practiceOrder[prev.currentScaleIndex];
       const newProgress = [...prev.scaleProgress];
       const scale = newProgress[orderIndex];
-      
-      if (!scale || scale.completed) return prev;
+
+      if (!scale) return prev;
 
       didAccept = true;
 
@@ -301,10 +368,6 @@ export default function Index() {
         completed: isNowCompleted,
       };
 
-      if (isNowCompleted) {
-        setTimeout(fireConfetti, 100);
-      }
-
       return { ...prev, scaleProgress: newProgress };
     });
 
@@ -313,6 +376,11 @@ export default function Index() {
       setIsAcceptPending(false);
       return;
     }
+
+    setDailyRepetitions((prev) => ({
+      ...prev,
+      [todayDayKey]: (prev[todayDayKey] || 0) + 1,
+    }));
 
     lastAcceptAtRef.current = Date.now();
 
@@ -334,7 +402,7 @@ export default function Index() {
         acceptUnlockTimeoutRef.current = null;
       }, remainingLock);
     }, 500);
-  }, [settings.repetitionsRequired, fireConfetti, moveToNextScale, setPracticeState]);
+  }, [settings.repetitionsRequired, moveToNextScale, setDailyRepetitions, setPracticeState, todayDayKey]);
 
   const handleDecline = useCallback(() => {
     moveToNextScale();
@@ -343,7 +411,9 @@ export default function Index() {
   const handleReset = useCallback(() => {
     recentFingerPatternsRef.current = [];
     setPracticeState(initializePracticeState(settings));
-  }, [settings, setPracticeState]);
+    setDailyRepetitions({});
+    setDailyGoalCelebrations({});
+  }, [settings, setDailyGoalCelebrations, setDailyRepetitions, setPracticeState]);
 
   const handleSettingsChange = useCallback(
     (newSettings: PracticeSettings) => {
@@ -357,8 +427,10 @@ export default function Index() {
       prevScalesRef.current = importedSettings.scales;
       setRawSettings(importedSettings);
       setPracticeState(importedState);
+      setDailyRepetitions({});
+      setDailyGoalCelebrations({});
     },
-    [setRawSettings, setPracticeState]
+    [setDailyGoalCelebrations, setDailyRepetitions, setRawSettings, setPracticeState]
   );
 
   // Cleanup pending navigation on unmount
@@ -402,7 +474,8 @@ export default function Index() {
   }, [toggle, settings.metronome.enabled]);
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background p-4 flex flex-col">
+      <div className="flex-1 flex items-center justify-center">
       {/* Main Container Box */}
       <div className="w-full max-w-6xl bg-card rounded-2xl border border-border material-shadow-xl relative">
         {/* Top Left Controls */}
@@ -426,6 +499,7 @@ export default function Index() {
             onOpenChange={setSettingsOpen}
             practiceState={practiceState}
             onImport={handleImport}
+            initialTab={settingsInitialTab}
           />
         </div>
 
@@ -439,46 +513,24 @@ export default function Index() {
                 <h1 className="text-3xl font-bold text-foreground">Scaled</h1>
                 <div className="w-64 mx-auto space-y-2 mt-2">
                   <Progress
-                    value={(currentRepetitions / totalRepetitions) * 100}
+                    value={(weeklyCompletedRepetitions / weeklyGoalRepetitions) * 100}
                     className="h-1.5 bg-secondary"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {currentRepetitions} of {totalRepetitions} scales completed
+                    {todayPaceProgressDisplay} or {dailyTargetDisplay} completed scales towards today's target
                   </p>
                 </div>
               </div>
 
-              {/* Current Scale Card or Completion */}
-              {allCompleted ? (
-                <div className="text-center space-y-6 animate-scale-in">
-                  <div className="w-24 h-24 mx-auto bg-success/10 rounded-full flex items-center justify-center">
-                    <MdEmojiEvents className="w-10 h-10 text-success" />
-                  </div>
-                  <div className="space-y-2">
-                    <h2 className="text-3xl font-bold text-foreground">
-                      Practice Complete!
-                    </h2>
-                    <p className="text-muted-foreground">
-                      You've mastered all {practiceState.scaleProgress.length} scales
-                    </p>
-                  </div>
-                  <Button
-                    size="lg"
-                    onClick={handleReset}
-                    className="rounded-xl h-14 px-8"
-                  >
-                    <MdRefresh className="w-5 h-5 mr-2" />
-                    Start New Session
-                  </Button>
-                </div>
-              ) : currentScale ? (
+              {/* Current Scale Card */}
+              {currentScale ? (
                 <ScaleCard
                   scaleName={currentScale.name}
                   successCount={currentScale.successCount}
                   repetitionsRequired={settings.repetitionsRequired}
                   onAccept={handleAccept}
                   onDecline={handleDecline}
-                  isCompleted={currentScale.completed}
+                  isCompleted={false}
                   acceptDisabled={isAcceptPending}
                   fingerCombination={chosenFingerPattern}
                   fingerPatterns={settings.fingerPatterns}
@@ -491,13 +543,35 @@ export default function Index() {
               <ProgressTracker
                 scaleProgress={practiceState.scaleProgress}
                 repetitionsRequired={settings.repetitionsRequired}
+                weeklyGoalRepetitions={weeklyGoalRepetitions}
+                weeklyCompletedRepetitions={weeklyCompletedRepetitions}
+                dailyTargetRepetitions={dailyTargetRepetitions}
+                dailyRemainingRepetitions={dailyRemainingRepetitions}
                 currentScale={currentScale?.name || ''}
-                onOpenSettings={() => setSettingsOpen(true)}
+                onOpenSettings={() => {
+                  setSettingsInitialTab('scales');
+                  setSettingsOpen(true);
+                }}
               />
             </aside>
           </div>
         </main>
       </div>
+      </div>
+
+      <footer className="pt-4 text-xs text-muted-foreground flex items-center justify-center gap-6">
+        <Link to="/about" className="text-primary underline hover:text-primary/90">
+          About + How to Use
+        </Link>
+        <a
+          href="https://practice-mate.app/"
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary underline hover:text-primary/90"
+        >
+          More Apps
+        </a>
+      </footer>
     </div>
   );
 }

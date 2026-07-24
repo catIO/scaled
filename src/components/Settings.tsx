@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MdSettings, MdAdd, MdDelete, MdFileUpload, MdFileDownload } from 'react-icons/md';
 import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
@@ -57,7 +57,9 @@ const isValidBackup = (data: any): data is { settings: PracticeSettings; practic
   if (!Array.isArray(settings.scales)) return false;
   if (!settings.scales.every((s: any) => typeof s === 'string')) return false;
   if (typeof settings.repetitionsRequired !== 'number' || settings.repetitionsRequired < 1) return false;
-  
+  if (settings.weeklyGoalRepetitions !== undefined && (typeof settings.weeklyGoalRepetitions !== 'number' || settings.weeklyGoalRepetitions < 1)) return false;
+  if (settings.weekStartsOn !== undefined && !['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(settings.weekStartsOn)) return false;
+
   if (!settings.metronome || typeof settings.metronome !== 'object') return false;
   if (typeof settings.metronome.enabled !== 'boolean') return false;
   if (typeof settings.metronome.bpm !== 'number' || settings.metronome.bpm < 30 || settings.metronome.bpm > 300) return false;
@@ -93,6 +95,7 @@ interface SettingsProps {
   onOpenChange?: (open: boolean) => void;
   practiceState: PracticeState;
   onImport: (settings: PracticeSettings, state: PracticeState) => void;
+  initialTab?: 'scales' | 'goals' | 'fingers';
 }
 
 export function Settings({
@@ -103,14 +106,25 @@ export function Settings({
   onOpenChange,
   practiceState,
   onImport,
+  initialTab,
 }: SettingsProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
   const [newScale, setNewScale] = useState('');
+  const [activeTab, setActiveTab] = useState<'scales' | 'goals' | 'fingers'>(initialTab || 'scales');
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [octaves, setOctaves] = useState('1');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const suggestedWeeklyGoal = settings.scales.length * settings.repetitionsRequired;
+  const dailyTarget = suggestedWeeklyGoal / 7;
+  const dailyTargetRounded = Math.max(1, Math.ceil(dailyTarget));
+
+  useEffect(() => {
+    if (open) {
+      setActiveTab(initialTab || 'scales');
+    }
+  }, [initialTab, open]);
 
   const handleExport = () => {
     try {
@@ -130,7 +144,7 @@ export function Settings({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
+
       toast({
         title: "Export Success",
         description: "Your practice settings and progress have been downloaded.",
@@ -159,23 +173,31 @@ export function Settings({
         const text = e.target?.result;
         if (typeof text !== 'string') return;
         const json = JSON.parse(text);
-        
+
         if (isValidBackup(json)) {
           const { settings: importedSettings, practiceState: importedState } = json;
-          
+
           // Fallback check for finger patterns if undefined
           if (!importedSettings.fingerPatterns) {
             importedSettings.fingerPatterns = [];
           }
 
+          // Goal settings migration for older backups
+          if (!importedSettings.weeklyGoalRepetitions || importedSettings.weeklyGoalRepetitions < 1) {
+            importedSettings.weeklyGoalRepetitions = importedSettings.scales.length * importedSettings.repetitionsRequired;
+          }
+          if (!importedSettings.weekStartsOn) {
+            importedSettings.weekStartsOn = 'monday';
+          }
+
           // Integrity check: match scales and progress elements
           const scaleNames = importedSettings.scales;
           const progressNames = importedState.scaleProgress.map((p) => p.name);
-          
+
           // Verify identical scales set
-          const match = scaleNames.length === progressNames.length && 
+          const match = scaleNames.length === progressNames.length &&
             scaleNames.every((name) => progressNames.includes(name));
-            
+
           if (!match) {
             toast({
               title: "Import Error",
@@ -202,7 +224,7 @@ export function Settings({
 
           onImport(importedSettings, importedState);
           setOpen(false);
-          
+
           toast({
             title: "Import Success",
             description: "Practice settings and progress restored successfully.",
@@ -284,33 +306,15 @@ export function Settings({
           <DialogTitle className="text-xl font-bold">Practice Settings</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="scales" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'scales' | 'goals' | 'fingers')} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="scales">Scales</TabsTrigger>
+            <TabsTrigger value="goals">Goals</TabsTrigger>
             <TabsTrigger value="fingers">Finger Patterns</TabsTrigger>
           </TabsList>
 
           {/* Scales Tab */}
           <TabsContent value="scales" className="space-y-6 mt-4">
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Required Repetitions</Label>
-              <div className="flex items-center gap-4">
-                <Slider
-                  value={[settings.repetitionsRequired]}
-                  onValueChange={([value]) =>
-                    onSettingsChange({ ...settings, repetitionsRequired: value })
-                  }
-                  min={1}
-                  max={10}
-                  step={1}
-                  className="flex-1"
-                />
-                <span className="w-12 text-center text-lg font-bold text-primary">
-                  {settings.repetitionsRequired}
-                </span>
-              </div>
-            </div>
-
             <div className="space-y-3">
               <Label className="text-sm font-medium">Scales to Practice</Label>
 
@@ -411,6 +415,106 @@ export function Settings({
             </div>
           </TabsContent>
 
+          {/* Goals Tab */}
+          <TabsContent value="goals" className="space-y-6 mt-4">
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Repetitions Per Scale</Label>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[settings.repetitionsRequired]}
+                  onValueChange={([value]) =>
+                    onSettingsChange({ ...settings, repetitionsRequired: value })
+                  }
+                  min={1}
+                  max={10}
+                  step={1}
+                  className="flex-1"
+                />
+                <span className="w-12 text-center text-lg font-bold text-primary">
+                  {settings.repetitionsRequired}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Weekly Goal</Label>
+              <p className="text-sm text-foreground">
+                {suggestedWeeklyGoal} completed scales/week
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Daily target: {dailyTargetRounded} completed scales/day.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Week Starts On</Label>
+              <Select
+                value={settings.weekStartsOn}
+                onValueChange={(value) =>
+                  onSettingsChange({
+                    ...settings,
+                    weekStartsOn: value as PracticeSettings['weekStartsOn'],
+                  })
+                }
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select week start" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monday">Monday</SelectItem>
+                  <SelectItem value="tuesday">Tuesday</SelectItem>
+                  <SelectItem value="wednesday">Wednesday</SelectItem>
+                  <SelectItem value="thursday">Thursday</SelectItem>
+                  <SelectItem value="friday">Friday</SelectItem>
+                  <SelectItem value="saturday">Saturday</SelectItem>
+                  <SelectItem value="sunday">Sunday</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Data Management Section */}
+            <div className="pt-4 border-t space-y-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold text-foreground">Data Management</h3>
+                <p className="text-xs text-muted-foreground">
+                  Backup your settings and progress or restore them from a previous backup.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleExport}
+                  className="flex items-center justify-center gap-2 h-10 rounded-lg"
+                >
+                  <MdFileDownload className="w-4 h-4" />
+                  Export Data
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleImportClick}
+                  className="flex items-center justify-center gap-2 h-10 rounded-lg"
+                >
+                  <MdFileUpload className="w-4 h-4" />
+                  Import Data
+                </Button>
+              </div>
+
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to reset all progress? This will reset all current session practice scores and shufflings. This action cannot be undone.")) {
+                    onReset();
+                    setOpen(false);
+                  }
+                }}
+                className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive h-10 rounded-lg font-medium"
+              >
+                Reset All Progress
+              </Button>
+            </div>
+          </TabsContent>
+
           {/* Finger Patterns Tab */}
           <TabsContent value="fingers" className="space-y-6 mt-4">
             <div className="space-y-4">
@@ -453,55 +557,13 @@ export function Settings({
           </TabsContent>
         </Tabs>
 
-        {/* Data Management Section */}
-        <div className="pt-4 border-t space-y-4">
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-foreground">Data Management</h3>
-            <p className="text-xs text-muted-foreground">
-              Backup your settings and progress or restore them from a previous backup.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              variant="outline"
-              onClick={handleExport}
-              className="flex items-center justify-center gap-2 h-10 rounded-lg"
-            >
-              <MdFileDownload className="w-4 h-4" />
-              Export Data
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleImportClick}
-              className="flex items-center justify-center gap-2 h-10 rounded-lg"
-            >
-              <MdFileUpload className="w-4 h-4" />
-              Import Data
-            </Button>
-          </div>
-
-          <Button
-            variant="ghost"
-            onClick={() => {
-              if (window.confirm("Are you sure you want to reset all progress? This will reset all current session practice scores and shufflings. This action cannot be undone.")) {
-                onReset();
-                setOpen(false);
-              }
-            }}
-            className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive h-10 rounded-lg font-medium"
-          >
-            Reset All Progress
-          </Button>
-
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImportFile}
-            accept=".json"
-            className="hidden"
-          />
-        </div>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleImportFile}
+          accept=".json"
+          className="hidden"
+        />
       </DialogContent>
     </Dialog>
   );

@@ -2,6 +2,7 @@ import { useState, lazy, Suspense } from 'react';
 import { ScaleProgress } from '@/types/practice';
 import { MdEdit, MdMusicNote } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { SCALE_DICTIONARY, getBaseScaleName, getOctaveCount, generateMultiOctaveABC } from '@/lib/notation';
 
@@ -12,20 +13,31 @@ const ScaleNotationModal = lazy(() =>
 interface ProgressTrackerProps {
   scaleProgress: ScaleProgress[];
   repetitionsRequired: number;
+  weeklyGoalRepetitions: number;
+  weeklyCompletedRepetitions: number;
+  dailyTargetRepetitions: number;
+  dailyRemainingRepetitions: number;
   currentScale: string;
   onOpenSettings?: () => void;
 }
 
-export function ProgressTracker({ scaleProgress, repetitionsRequired, currentScale, onOpenSettings }: ProgressTrackerProps) {
+export function ProgressTracker({
+  scaleProgress,
+  repetitionsRequired,
+  weeklyGoalRepetitions,
+  weeklyCompletedRepetitions,
+  dailyTargetRepetitions,
+  dailyRemainingRepetitions,
+  currentScale,
+  onOpenSettings,
+}: ProgressTrackerProps) {
   const [notationScale, setNotationScale] = useState<{ name: string, abc: string } | null>(null);
 
-  const minSuccessCount = scaleProgress.length
-    ? Math.min(...scaleProgress.map((s) => s.successCount))
+  const weeklyProgressPct = weeklyGoalRepetitions
+    ? (weeklyCompletedRepetitions / weeklyGoalRepetitions) * 100
     : 0;
-  const setPlays = Math.max(0, Math.min(minSuccessCount, repetitionsRequired));
-  const setProgressPct = repetitionsRequired
-    ? (setPlays / repetitionsRequired) * 100
-    : 0;
+  const dailyTargetRounded = Math.max(1, Math.ceil(dailyTargetRepetitions));
+  const dailyRemainingRounded = Math.max(0, Math.ceil(dailyRemainingRepetitions));
 
   return (
     <div className="w-full space-y-3">
@@ -33,29 +45,37 @@ export function ProgressTracker({ scaleProgress, repetitionsRequired, currentSca
         <h3 className="text-m font-bold text-muted-foreground uppercase tracking-wider py-2">Progress</h3>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            Set: {setPlays}/{repetitionsRequired}
+            Week: {weeklyCompletedRepetitions}/{weeklyGoalRepetitions}
           </span>
         </div>
         {onOpenSettings && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onOpenSettings}
-            aria-label="Open settings"
-            className={`${CONTROL_BUTTON_SIZE} rounded-xl hover:bg-muted p-0 flex items-center justify-center`}
-          >
-            <MdEdit className={`${CONTROL_ICON_SIZE} text-foreground`} />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onOpenSettings}
+                aria-label="Edit scales"
+                className={`${CONTROL_BUTTON_SIZE} rounded-xl hover:bg-muted p-0 flex items-center justify-center`}
+              >
+                <MdEdit className={`${CONTROL_ICON_SIZE} text-foreground`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Edit scales</TooltipContent>
+          </Tooltip>
         )}
       </div>
 
       <div className="h-2 bg-muted rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-500 ease-out ${
-            setPlays >= repetitionsRequired ? 'bg-success' : 'bg-primary'
-          }`}
-          style={{ width: `${Math.min(setProgressPct, 100)}%` }}
+          className={`h-full rounded-full transition-all duration-500 ease-out ${weeklyCompletedRepetitions >= weeklyGoalRepetitions ? 'bg-success' : 'bg-primary'
+            }`}
+          style={{ width: `${Math.min(weeklyProgressPct, 100)}%` }}
         />
+      </div>
+
+      <div className="text-xs text-muted-foreground">
+        Daily target: {dailyTargetRounded} reps | Remaining today: {dailyRemainingRounded}
       </div>
 
       <div className="grid gap-2 overflow-y-auto pr-2">
