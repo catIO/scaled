@@ -161,7 +161,7 @@ export default function Index() {
 
   const { isPlaying, toggle } = useMetronome(settings.metronome);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'scales' | 'goals' | 'fingers'>('scales');
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'scales' | 'goals' | 'fingers'>('goals');
   const [isAcceptPending, setIsAcceptPending] = useState(false);
   const [goalModalDismissed, setGoalModalDismissed] = useState(false);
 
@@ -502,6 +502,7 @@ export default function Index() {
               practiceState={practiceState}
               onImport={handleImport}
               initialTab={settingsInitialTab}
+              onGearClick={() => setSettingsInitialTab('goals')}
             />
           </div>
 

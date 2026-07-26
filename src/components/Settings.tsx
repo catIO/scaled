@@ -96,6 +96,7 @@ interface SettingsProps {
   practiceState: PracticeState;
   onImport: (settings: PracticeSettings, state: PracticeState) => void;
   initialTab?: 'scales' | 'goals' | 'fingers';
+  onGearClick?: () => void;
 }
 
 export function Settings({
@@ -108,6 +109,7 @@ export function Settings({
   practiceState,
   onImport,
   initialTab,
+  onGearClick,
 }: SettingsProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -301,6 +303,7 @@ export function Settings({
           variant="ghost"
           size="icon"
           aria-label="Open settings"
+          onClick={onGearClick}
           className={`${CONTROL_BUTTON_SIZE} rounded-xl hover:bg-muted p-0 flex items-center justify-center`}
         >
           <MdSettings className={`${CONTROL_ICON_SIZE} text-foreground`} />
@@ -314,8 +317,8 @@ export function Settings({
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'scales' | 'goals' | 'fingers')} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="scales">Scales</TabsTrigger>
-            <TabsTrigger value="goals">Goals</TabsTrigger>
             <TabsTrigger value="fingers">Finger Patterns</TabsTrigger>
+            <TabsTrigger value="goals">Goals</TabsTrigger>
           </TabsList>
 
           {/* Scales Tab */}

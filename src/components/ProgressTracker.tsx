@@ -111,7 +111,7 @@ export function ProgressTracker({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-primary z-10"
+                      className="h-6 w-6 text-muted-foreground hover:bg-primary/10 hover:text-primary z-10"
                       onClick={() => setNotationScale(notation)}
                       aria-label={`View notation for ${scale.name}`}
                     >
