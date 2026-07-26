@@ -16,7 +16,7 @@ export interface PracticeSettings {
   scales: string[];
   repetitionsRequired: number;
   weeklyGoalRepetitions: number;
-  weekStartsOn: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+  cycleDays: number;
   metronome: MetronomeSettings;
   fingerPatterns: string[]; // array of finger patterns to use for all scales
 }
@@ -25,6 +25,7 @@ export interface PracticeState {
   currentScaleIndex: number;
   scaleProgress: ScaleProgress[];
   practiceOrder: number[];
+  cycleStartDate: string;
 }
 
 export const DEFAULT_SCALES = [
@@ -39,7 +40,7 @@ export const DEFAULT_SETTINGS: PracticeSettings = {
   scales: DEFAULT_SCALES,
   repetitionsRequired: 3,
   weeklyGoalRepetitions: DEFAULT_SCALES.length * 3,
-  weekStartsOn: 'monday',
+  cycleDays: 7,
   metronome: {
     enabled: true,
     bpm: 80,

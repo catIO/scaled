@@ -8,6 +8,7 @@ import { ScaleCard } from '@/components/ScaleCard';
 import { ProgressTracker } from '@/components/ProgressTracker';
 import { MetronomeIndicator } from '@/components/MetronomeIndicator';
 import { Settings } from '@/components/Settings';
+import { GoalAchievementModal } from '@/components/GoalAchievementModal';
 import {
   PracticeSettings,
   PracticeState,
@@ -16,35 +17,10 @@ import {
 } from '@/types/practice';
 import { getNextFingerCombination } from '@/lib/fingerCombinations';
 
-const WEEKDAY_TO_INDEX: Record<PracticeSettings['weekStartsOn'], number> = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
-};
-
 function getStartOfDay(date: Date): Date {
   const day = new Date(date);
   day.setHours(0, 0, 0, 0);
   return day;
-}
-
-function getWeekStartDate(date: Date, weekStartsOn: PracticeSettings['weekStartsOn']): Date {
-  const today = getStartOfDay(date);
-  const currentDay = today.getDay();
-  const weekStart = WEEKDAY_TO_INDEX[weekStartsOn];
-  const diff = (currentDay - weekStart + 7) % 7;
-  const start = new Date(today);
-  start.setDate(today.getDate() - diff);
-  return start;
-}
-
-function getWeekKey(date: Date, weekStartsOn: PracticeSettings['weekStartsOn']): string {
-  const weekStart = getWeekStartDate(date, weekStartsOn);
-  return weekStart.toISOString().split('T')[0];
 }
 
 function getDayKey(date: Date): string {
@@ -76,6 +52,7 @@ function initializePracticeState(settings: PracticeSettings): PracticeState {
     currentScaleIndex: 0,
     scaleProgress,
     practiceOrder,
+    cycleStartDate: new Date().toISOString().split('T')[0],
   };
 }
 
@@ -152,17 +129,8 @@ export default function Index() {
       }
     }
 
-    const validWeekStartsOn: PracticeSettings['weekStartsOn'][] = [
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-      'sunday',
-    ];
-    if (!validWeekStartsOn.includes(migrated.weekStartsOn)) {
-      migrated.weekStartsOn = 'monday';
+    if (!migrated.cycleDays || !Number.isFinite(migrated.cycleDays) || migrated.cycleDays < 1) {
+      migrated.cycleDays = 7;
       needsUpdate = true;
     }
 
@@ -195,6 +163,7 @@ export default function Index() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<'scales' | 'goals' | 'fingers'>('scales');
   const [isAcceptPending, setIsAcceptPending] = useState(false);
+  const [goalModalDismissed, setGoalModalDismissed] = useState(false);
 
   // Track pending navigation to prevent race conditions
   const pendingNavigationRef = useRef<number | null>(null);
@@ -237,6 +206,7 @@ export default function Index() {
       );
 
       return {
+        ...prev,
         currentScaleIndex: 0,
         scaleProgress: newScaleProgress,
         practiceOrder: newPracticeOrder,
@@ -276,15 +246,29 @@ export default function Index() {
     1,
     settings.scales.length * settings.repetitionsRequired
   );
-  const dailyTargetRepetitions = weeklyGoalRepetitions / 7;
+  const cycleDays = settings.cycleDays || 7;
+  const dailyTargetRepetitions = weeklyGoalRepetitions / cycleDays;
   const today = new Date();
+  const todayStart = getStartOfDay(today);
+  const cycleStart = getStartOfDay(
+    practiceState.cycleStartDate ? new Date(practiceState.cycleStartDate) : today
+  );
+  const elapsedDays = Math.floor((todayStart.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const currentDayOfCycle = Math.min(cycleDays, Math.max(1, elapsedDays));
+
   const todayDayKey = getDayKey(today);
-  const thisWeekKey = getWeekKey(today, settings.weekStartsOn);
   const todayCompletedRepetitions = dailyRepetitions[todayDayKey] || 0;
   const dailyRemainingRepetitions = Math.max(0, dailyTargetRepetitions - todayCompletedRepetitions);
   const dailyTargetDisplay = Math.max(1, Math.ceil(dailyTargetRepetitions));
   const todayPaceProgressDisplay = Math.min(todayCompletedRepetitions, dailyTargetDisplay);
   const isOnDailyPace = todayCompletedRepetitions >= dailyTargetRepetitions;
+
+  const allCompleted = useMemo(
+    () =>
+      practiceState.scaleProgress.length > 0 &&
+      practiceState.scaleProgress.every((s) => s.completed),
+    [practiceState.scaleProgress]
+  );
 
   const fireConfetti = useCallback(() => {
     confetti({
@@ -296,7 +280,7 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    const celebrationKey = `${thisWeekKey}:${todayDayKey}`;
+    const celebrationKey = todayDayKey;
     const alreadyCelebrated = dailyGoalCelebrations[celebrationKey];
     const reachedDailyPace = todayCompletedRepetitions >= dailyTargetRepetitions;
 
@@ -312,10 +296,16 @@ export default function Index() {
     dailyGoalCelebrations,
     fireConfetti,
     setDailyGoalCelebrations,
-    thisWeekKey,
     todayDayKey,
     todayCompletedRepetitions,
   ]);
+
+  // Celebrate goal completion when all exercises are finished
+  useEffect(() => {
+    if (allCompleted && !goalModalDismissed) {
+      fireConfetti();
+    }
+  }, [allCompleted, goalModalDismissed, fireConfetti]);
 
   const moveToNextScale = useCallback(() => {
     setPracticeState((prev) => {
@@ -410,10 +400,21 @@ export default function Index() {
 
   const handleReset = useCallback(() => {
     recentFingerPatternsRef.current = [];
+    setGoalModalDismissed(false);
     setPracticeState(initializePracticeState(settings));
     setDailyRepetitions({});
     setDailyGoalCelebrations({});
   }, [settings, setDailyGoalCelebrations, setDailyRepetitions, setPracticeState]);
+
+  const handleStartNewCycle = useCallback(
+    (newCycleDays: number) => {
+      recentFingerPatternsRef.current = [];
+      setGoalModalDismissed(false);
+      setRawSettings((prev) => ({ ...prev, cycleDays: newCycleDays }));
+      setPracticeState(initializePracticeState({ ...settings, cycleDays: newCycleDays }));
+    },
+    [settings, setPracticeState, setRawSettings]
+  );
 
   const handleSettingsChange = useCallback(
     (newSettings: PracticeSettings) => {
@@ -495,6 +496,7 @@ export default function Index() {
               settings={settings}
               onSettingsChange={handleSettingsChange}
               onReset={handleReset}
+              onStartNewCycle={handleStartNewCycle}
               open={settingsOpen}
               onOpenChange={setSettingsOpen}
               practiceState={practiceState}
@@ -517,7 +519,7 @@ export default function Index() {
                       className="h-1.5 bg-secondary"
                     />
                     <p className="text-xs text-muted-foreground">
-                      {todayPaceProgressDisplay} or {dailyTargetDisplay} completed scales towards today's target
+                      Day {currentDayOfCycle} of {cycleDays} — {todayPaceProgressDisplay} of {dailyTargetDisplay} daily scales completed
                     </p>
                   </div>
                 </div>
@@ -548,6 +550,7 @@ export default function Index() {
                   dailyTargetRepetitions={dailyTargetRepetitions}
                   dailyRemainingRepetitions={dailyRemainingRepetitions}
                   currentScale={currentScale?.name || ''}
+                  cycleDays={settings.cycleDays || 7}
                   onOpenSettings={() => {
                     setSettingsInitialTab('scales');
                     setSettingsOpen(true);
@@ -558,6 +561,15 @@ export default function Index() {
           </main>
         </div>
       </div>
+
+      <GoalAchievementModal
+        isOpen={allCompleted && !goalModalDismissed}
+        onClose={() => setGoalModalDismissed(true)}
+        onStartNewCycle={handleStartNewCycle}
+        completedScalesCount={practiceState.scaleProgress.length}
+        totalRepetitionsCompleted={weeklyCompletedRepetitions}
+        currentCycleDays={settings.cycleDays || 7}
+      />
 
       <footer className="pt-4 text-xs text-muted-foreground flex items-center justify-center gap-6">
         <Link to="/about" className="text-primary underline hover:text-primary/90">

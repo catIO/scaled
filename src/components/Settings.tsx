@@ -58,7 +58,6 @@ const isValidBackup = (data: any): data is { settings: PracticeSettings; practic
   if (!settings.scales.every((s: any) => typeof s === 'string')) return false;
   if (typeof settings.repetitionsRequired !== 'number' || settings.repetitionsRequired < 1) return false;
   if (settings.weeklyGoalRepetitions !== undefined && (typeof settings.weeklyGoalRepetitions !== 'number' || settings.weeklyGoalRepetitions < 1)) return false;
-  if (settings.weekStartsOn !== undefined && !['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(settings.weekStartsOn)) return false;
 
   if (!settings.metronome || typeof settings.metronome !== 'object') return false;
   if (typeof settings.metronome.enabled !== 'boolean') return false;
@@ -91,6 +90,7 @@ interface SettingsProps {
   settings: PracticeSettings;
   onSettingsChange: (settings: PracticeSettings) => void;
   onReset: () => void;
+  onStartNewCycle?: (cycleDays: number) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   practiceState: PracticeState;
@@ -102,6 +102,7 @@ export function Settings({
   settings,
   onSettingsChange,
   onReset,
+  onStartNewCycle,
   open: controlledOpen,
   onOpenChange,
   practiceState,
@@ -116,8 +117,9 @@ export function Settings({
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [octaves, setOctaves] = useState('1');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cycleDays = settings.cycleDays || 7;
   const suggestedWeeklyGoal = settings.scales.length * settings.repetitionsRequired;
-  const dailyTarget = suggestedWeeklyGoal / 7;
+  const dailyTarget = suggestedWeeklyGoal / cycleDays;
   const dailyTargetRounded = Math.max(1, Math.ceil(dailyTarget));
 
   useEffect(() => {
@@ -186,8 +188,11 @@ export function Settings({
           if (!importedSettings.weeklyGoalRepetitions || importedSettings.weeklyGoalRepetitions < 1) {
             importedSettings.weeklyGoalRepetitions = importedSettings.scales.length * importedSettings.repetitionsRequired;
           }
-          if (!importedSettings.weekStartsOn) {
-            importedSettings.weekStartsOn = 'monday';
+          if (!importedSettings.cycleDays || importedSettings.cycleDays < 1) {
+            importedSettings.cycleDays = 7;
+          }
+          if (!importedState.cycleStartDate) {
+            importedState.cycleStartDate = new Date().toISOString().split('T')[0];
           }
 
           // Integrity check: match scales and progress elements
@@ -437,40 +442,48 @@ export function Settings({
             </div>
 
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Weekly Goal</Label>
-              <p className="text-sm text-foreground">
-                {suggestedWeeklyGoal} completed scales/week
+              <Label className="text-sm font-medium">Goal Timeline</Label>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[settings.cycleDays || 7]}
+                  onValueChange={([value]) =>
+                    onSettingsChange({ ...settings, cycleDays: value })
+                  }
+                  min={1}
+                  max={30}
+                  step={1}
+                  className="flex-1"
+                />
+                <span className="w-16 text-right text-base font-bold text-primary">
+                  {settings.cycleDays || 7} Days
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Target: {suggestedWeeklyGoal} completed scales over {settings.cycleDays || 7} days.
               </p>
               <p className="text-xs text-muted-foreground">
-                Daily target: {dailyTargetRounded} completed scales/day.
+                Daily pace target: {dailyTargetRounded} completed scales/day.
               </p>
             </div>
 
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Week Starts On</Label>
-              <Select
-                value={settings.weekStartsOn}
-                onValueChange={(value) =>
-                  onSettingsChange({
-                    ...settings,
-                    weekStartsOn: value as PracticeSettings['weekStartsOn'],
-                  })
-                }
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select week start" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monday">Monday</SelectItem>
-                  <SelectItem value="tuesday">Tuesday</SelectItem>
-                  <SelectItem value="wednesday">Wednesday</SelectItem>
-                  <SelectItem value="thursday">Thursday</SelectItem>
-                  <SelectItem value="friday">Friday</SelectItem>
-                  <SelectItem value="saturday">Saturday</SelectItem>
-                  <SelectItem value="sunday">Sunday</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {onStartNewCycle && (
+              <div className="p-3 bg-muted/40 rounded-xl border border-border flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Current Cycle</p>
+                  <p className="text-xs text-muted-foreground">Started: {practiceState.cycleStartDate || 'Today'}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    onStartNewCycle(settings.cycleDays || 7);
+                    setOpen(false);
+                  }}
+                >
+                  Start New Cycle
+                </Button>
+              </div>
+            )}
 
             {/* Data Management Section */}
             <div className="pt-4 border-t space-y-4">

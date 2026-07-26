@@ -18,6 +18,7 @@ interface ProgressTrackerProps {
   dailyTargetRepetitions: number;
   dailyRemainingRepetitions: number;
   currentScale: string;
+  cycleDays?: number;
   onOpenSettings?: () => void;
 }
 
@@ -29,6 +30,7 @@ export function ProgressTracker({
   dailyTargetRepetitions,
   dailyRemainingRepetitions,
   currentScale,
+  cycleDays = 7,
   onOpenSettings,
 }: ProgressTrackerProps) {
   const [notationScale, setNotationScale] = useState<{ name: string, abc: string } | null>(null);
@@ -45,7 +47,7 @@ export function ProgressTracker({
         <h3 className="text-m font-bold text-muted-foreground uppercase tracking-wider py-2">Progress</h3>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            Week: {weeklyCompletedRepetitions}/{weeklyGoalRepetitions}
+            {weeklyCompletedRepetitions}/{weeklyGoalRepetitions}
           </span>
         </div>
         {onOpenSettings && (
