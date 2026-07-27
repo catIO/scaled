@@ -16,16 +16,12 @@ import {
   DEFAULT_SETTINGS,
 } from '@/types/practice';
 import { getNextFingerCombination } from '@/lib/fingerCombinations';
-
-function getStartOfDay(date: Date): Date {
-  const day = new Date(date);
-  day.setHours(0, 0, 0, 0);
-  return day;
-}
-
-function getDayKey(date: Date): string {
-  return getStartOfDay(date).toISOString().split('T')[0];
-}
+import {
+  getStartOfDay,
+  getDayKey,
+  getLocalDateString,
+  parseLocalDate,
+} from '@/lib/dateUtils';
 
 // Shuffle array using Fisher-Yates
 function shuffleArray<T>(array: T[]): T[] {
@@ -52,7 +48,7 @@ function initializePracticeState(settings: PracticeSettings): PracticeState {
     currentScaleIndex: 0,
     scaleProgress,
     practiceOrder,
-    cycleStartDate: new Date().toISOString().split('T')[0],
+    cycleStartDate: getLocalDateString(),
   };
 }
 
@@ -251,7 +247,7 @@ export default function Index() {
   const today = new Date();
   const todayStart = getStartOfDay(today);
   const cycleStart = getStartOfDay(
-    practiceState.cycleStartDate ? new Date(practiceState.cycleStartDate) : today
+    practiceState.cycleStartDate ? parseLocalDate(practiceState.cycleStartDate) : today
   );
   const elapsedDays = Math.floor((todayStart.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   const currentDayOfCycle = Math.min(cycleDays, Math.max(1, elapsedDays));

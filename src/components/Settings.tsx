@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { MdSettings, MdAdd, MdDelete, MdFileUpload, MdFileDownload } from 'react-icons/md';
 import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
+import { getLocalDateString } from '@/lib/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -142,7 +143,7 @@ export function Settings({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const dateStr = new Date().toISOString().split('T')[0];
+      const dateStr = getLocalDateString();
       link.download = `scaled-backup-${dateStr}.json`;
       document.body.appendChild(link);
       link.click();
@@ -194,7 +195,7 @@ export function Settings({
             importedSettings.cycleDays = 7;
           }
           if (!importedState.cycleStartDate) {
-            importedState.cycleStartDate = new Date().toISOString().split('T')[0];
+            importedState.cycleStartDate = getLocalDateString();
           }
 
           // Integrity check: match scales and progress elements
