@@ -21,6 +21,7 @@ import {
   getDayKey,
   getLocalDateString,
   parseLocalDate,
+  calculateDailyGoal,
 } from '@/lib/dateUtils';
 
 // Shuffle array using Fisher-Yates
@@ -240,10 +241,9 @@ export default function Index() {
 
   const weeklyGoalRepetitions = Math.max(
     1,
-    settings.scales.length * settings.repetitionsRequired
+    settings.weeklyGoalRepetitions || (settings.scales.length * settings.repetitionsRequired)
   );
   const cycleDays = settings.cycleDays || 7;
-  const dailyTargetRepetitions = weeklyGoalRepetitions / cycleDays;
   const today = new Date();
   const todayStart = getStartOfDay(today);
   const cycleStart = getStartOfDay(
@@ -254,10 +254,20 @@ export default function Index() {
 
   const todayDayKey = getDayKey(today);
   const todayCompletedRepetitions = dailyRepetitions[todayDayKey] || 0;
-  const dailyRemainingRepetitions = Math.max(0, dailyTargetRepetitions - todayCompletedRepetitions);
-  const dailyTargetDisplay = Math.max(1, Math.ceil(dailyTargetRepetitions));
-  const todayPaceProgressDisplay = Math.min(todayCompletedRepetitions, dailyTargetDisplay);
-  const isOnDailyPace = todayCompletedRepetitions >= dailyTargetRepetitions;
+
+  const {
+    dailyTargetRepetitions,
+    dailyRemainingRepetitions,
+    dailyTargetDisplay,
+    todayPaceProgressDisplay,
+    isOnDailyPace,
+  } = calculateDailyGoal({
+    weeklyGoalRepetitions,
+    weeklyCompletedRepetitions,
+    todayCompletedRepetitions,
+    cycleDays,
+    currentDayOfCycle,
+  });
 
   const allCompleted = useMemo(
     () =>
@@ -408,8 +418,10 @@ export default function Index() {
       setGoalModalDismissed(false);
       setRawSettings((prev) => ({ ...prev, cycleDays: newCycleDays }));
       setPracticeState(initializePracticeState({ ...settings, cycleDays: newCycleDays }));
+      setDailyRepetitions({});
+      setDailyGoalCelebrations({});
     },
-    [settings, setPracticeState, setRawSettings]
+    [settings, setPracticeState, setRawSettings, setDailyRepetitions, setDailyGoalCelebrations]
   );
 
   const handleSettingsChange = useCallback(

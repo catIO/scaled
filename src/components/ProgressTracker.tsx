@@ -38,7 +38,7 @@ export function ProgressTracker({
   const weeklyProgressPct = weeklyGoalRepetitions
     ? (weeklyCompletedRepetitions / weeklyGoalRepetitions) * 100
     : 0;
-  const dailyTargetRounded = Math.max(1, Math.ceil(dailyTargetRepetitions));
+  const dailyTargetRounded = Math.ceil(dailyTargetRepetitions);
   const dailyRemainingRounded = Math.max(0, Math.ceil(dailyRemainingRepetitions));
 
   return (

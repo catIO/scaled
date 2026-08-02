@@ -35,3 +35,58 @@ export function parseLocalDate(dateStr: string): Date {
 export function getDayKey(date: Date = new Date()): string {
   return getLocalDateString(getStartOfDay(date));
 }
+
+export interface DailyGoalCalculation {
+  remainingDaysInCycle: number;
+  completedBeforeToday: number;
+  remainingGoalForCycle: number;
+  dailyTargetRepetitions: number;
+  dailyRemainingRepetitions: number;
+  dailyTargetDisplay: number;
+  todayPaceProgressDisplay: number;
+  isOnDailyPace: boolean;
+}
+
+/**
+ * Calculates the daily goal dynamically based on remaining repetitions for the cycle
+ * divided by the remaining days in the cycle (including today).
+ */
+export function calculateDailyGoal({
+  weeklyGoalRepetitions,
+  weeklyCompletedRepetitions,
+  todayCompletedRepetitions,
+  cycleDays,
+  currentDayOfCycle,
+}: {
+  weeklyGoalRepetitions: number;
+  weeklyCompletedRepetitions: number;
+  todayCompletedRepetitions: number;
+  cycleDays: number;
+  currentDayOfCycle: number;
+}): DailyGoalCalculation {
+  const safeCycleDays = Math.max(1, cycleDays);
+  const safeCurrentDay = Math.min(safeCycleDays, Math.max(1, currentDayOfCycle));
+  const remainingDaysInCycle = Math.max(1, safeCycleDays - safeCurrentDay + 1);
+
+  const completedBeforeToday = Math.max(0, weeklyCompletedRepetitions - todayCompletedRepetitions);
+  const remainingGoalForCycle = Math.max(0, weeklyGoalRepetitions - completedBeforeToday);
+
+  const dailyTargetRepetitions = remainingGoalForCycle / remainingDaysInCycle;
+  const dailyTargetDisplay = Math.ceil(dailyTargetRepetitions);
+
+  const dailyRemainingRepetitions = Math.max(0, dailyTargetDisplay - todayCompletedRepetitions);
+  const todayPaceProgressDisplay = Math.min(todayCompletedRepetitions, dailyTargetDisplay);
+  const isOnDailyPace = todayCompletedRepetitions >= dailyTargetRepetitions;
+
+  return {
+    remainingDaysInCycle,
+    completedBeforeToday,
+    remainingGoalForCycle,
+    dailyTargetRepetitions,
+    dailyRemainingRepetitions,
+    dailyTargetDisplay,
+    todayPaceProgressDisplay,
+    isOnDailyPace,
+  };
+}
+
