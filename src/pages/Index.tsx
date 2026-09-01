@@ -34,6 +34,48 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
+/**
+ * Shuffles scale indices [0..totalScales-1] while ensuring that scales played
+ * near the end of the previous round are not played at the start of the next round.
+ */
+function generateNextRoundOrder(totalScales: number, previousOrder: number[] = []): number[] {
+  if (totalScales <= 1) return [0];
+  if (totalScales === 2) {
+    const lastScale = previousOrder[previousOrder.length - 1];
+    return lastScale === 0 ? [1, 0] : [0, 1];
+  }
+
+  const baseIndices = Array.from({ length: totalScales }, (_, i) => i);
+  let maxBuffer = Math.min(Math.floor(totalScales / 2), 4);
+
+  while (maxBuffer > 0) {
+    const recentEnd = previousOrder.slice(-maxBuffer);
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const candidate = shuffleArray(baseIndices);
+      let valid = true;
+
+      for (let i = 0; i < candidate.length && i < maxBuffer; i++) {
+        const scale = candidate[i];
+        const recentIndex = recentEnd.lastIndexOf(scale);
+        if (recentIndex !== -1) {
+          const distance = (recentEnd.length - 1 - recentIndex) + 1 + i;
+          if (distance <= maxBuffer) {
+            valid = false;
+            break;
+          }
+        }
+      }
+
+      if (valid) {
+        return candidate;
+      }
+    }
+    maxBuffer--;
+  }
+
+  return shuffleArray(baseIndices);
+}
+
 function initializePracticeState(settings: PracticeSettings): PracticeState {
   const scaleProgress: ScaleProgress[] = settings.scales.map((name) => ({
     name,
@@ -206,7 +248,7 @@ export default function Index() {
     });
   }, [settings.scales, setPracticeState]);
 
-  const currentOrderIndex = practiceState.practiceOrder[practiceState.currentScaleIndex];
+  const currentOrderIndex = practiceState.practiceOrder[practiceState.currentScaleIndex] ?? practiceState.practiceOrder[0];
   const currentScale = practiceState.scaleProgress[currentOrderIndex];
 
   // Pick next finger combination when scale or patterns change; avoid recently used
@@ -307,15 +349,13 @@ export default function Index() {
     setPracticeState((prev) => {
       const total = prev.practiceOrder.length;
 
-      // Continue cycling through all scales, reshuffling each round.
+      // Continue cycling through all scales once before reshuffling for the next round.
       const nextPos = prev.currentScaleIndex + 1;
       if (nextPos < total) {
         return { ...prev, currentScaleIndex: nextPos };
       }
 
-      const newPracticeOrder = shuffleArray(
-        Array.from({ length: total }, (_, i) => i)
-      );
+      const newPracticeOrder = generateNextRoundOrder(total, prev.practiceOrder);
       return {
         ...prev,
         practiceOrder: newPracticeOrder,
