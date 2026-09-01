@@ -36,8 +36,22 @@ export function getDayKey(date: Date = new Date()): string {
   return getLocalDateString(getStartOfDay(date));
 }
 
+export function getElapsedDays(cycleStartDate?: string, today: Date = new Date()): number {
+  if (!cycleStartDate) return 1;
+  const todayStart = getStartOfDay(today);
+  const cycleStart = getStartOfDay(parseLocalDate(cycleStartDate));
+  const diffMs = todayStart.getTime() - cycleStart.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  return Math.max(1, diffDays + 1);
+}
+
 export interface DailyGoalCalculation {
+  elapsedDays: number;
+  currentDayOfCycle: number;
   remainingDaysInCycle: number;
+  daysRemainingAfterToday: number;
+  isOverdue: boolean;
+  daysLeftText: string;
   completedBeforeToday: number;
   remainingGoalForCycle: number;
   dailyTargetRepetitions: number;
@@ -56,17 +70,30 @@ export function calculateDailyGoal({
   weeklyCompletedRepetitions,
   todayCompletedRepetitions,
   cycleDays,
-  currentDayOfCycle,
+  currentDayOfCycle: explicitCurrentDay,
+  cycleStartDate,
+  today = new Date(),
 }: {
   weeklyGoalRepetitions: number;
   weeklyCompletedRepetitions: number;
   todayCompletedRepetitions: number;
   cycleDays: number;
-  currentDayOfCycle: number;
+  currentDayOfCycle?: number;
+  cycleStartDate?: string;
+  today?: Date;
 }): DailyGoalCalculation {
-  const safeCycleDays = Math.max(1, cycleDays);
-  const safeCurrentDay = Math.min(safeCycleDays, Math.max(1, currentDayOfCycle));
-  const remainingDaysInCycle = Math.max(1, safeCycleDays - safeCurrentDay + 1);
+  const safeCycleDays = Math.max(1, cycleDays || 7);
+  const elapsedDays = explicitCurrentDay ?? getElapsedDays(cycleStartDate, today);
+  const currentDayOfCycle = Math.min(safeCycleDays, elapsedDays);
+  const isOverdue = elapsedDays > safeCycleDays;
+  const daysRemainingAfterToday = Math.max(0, safeCycleDays - elapsedDays);
+  const remainingDaysInCycle = Math.max(1, safeCycleDays - elapsedDays + 1);
+
+  const daysLeftText = isOverdue
+    ? 'cycle ended'
+    : daysRemainingAfterToday === 0
+    ? 'last day'
+    : `${daysRemainingAfterToday} ${daysRemainingAfterToday === 1 ? 'day' : 'days'} left`;
 
   const completedBeforeToday = Math.max(0, weeklyCompletedRepetitions - todayCompletedRepetitions);
   const remainingGoalForCycle = Math.max(0, weeklyGoalRepetitions - completedBeforeToday);
@@ -79,7 +106,12 @@ export function calculateDailyGoal({
   const isOnDailyPace = todayCompletedRepetitions >= dailyTargetRepetitions;
 
   return {
+    elapsedDays,
+    currentDayOfCycle,
     remainingDaysInCycle,
+    daysRemainingAfterToday,
+    isOverdue,
+    daysLeftText,
     completedBeforeToday,
     remainingGoalForCycle,
     dailyTargetRepetitions,

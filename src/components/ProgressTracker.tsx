@@ -82,6 +82,7 @@ export function ProgressTracker({
 
       <div className="grid gap-2 overflow-y-auto pr-2">
         {scaleProgress.map((scale) => {
+          const isScaleCompleted = scale.successCount >= repetitionsRequired;
           const progress = (scale.successCount / repetitionsRequired) * 100;
           const isCurrent = scale.name === currentScale;
           const baseName = getBaseScaleName(scale.name);
@@ -98,7 +99,7 @@ export function ProgressTracker({
               className={`
                 relative overflow-hidden rounded-lg p-3 transition-all duration-300
                 ${isCurrent ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'}
-                ${scale.completed ? 'bg-success/10' : ''}
+                ${isScaleCompleted ? 'bg-success/10' : ''}
                 material-shadow-sm
               `}
             >
@@ -126,7 +127,7 @@ export function ProgressTracker({
 
               <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ease-out ${scale.completed ? 'bg-success' : 'bg-primary'
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${isScaleCompleted ? 'bg-success' : 'bg-primary'
                     }`}
                   style={{ width: `${Math.min(progress, 100)}%` }}
                 />

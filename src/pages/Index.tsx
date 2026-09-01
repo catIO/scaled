@@ -114,16 +114,11 @@ export default function Index() {
       }
     }
 
-    // Ensure weekly goal fields exist and remain in valid bounds
-    if (!Number.isFinite(migrated.weeklyGoalRepetitions) || migrated.weeklyGoalRepetitions < 1) {
-      migrated.weeklyGoalRepetitions = Math.max(1, migrated.scales.length * migrated.repetitionsRequired);
+    // Always keep weeklyGoalRepetitions in sync with scales * repetitionsRequired
+    const expectedWeeklyGoal = Math.max(1, migrated.scales.length * migrated.repetitionsRequired);
+    if (migrated.weeklyGoalRepetitions !== expectedWeeklyGoal) {
+      migrated.weeklyGoalRepetitions = expectedWeeklyGoal;
       needsUpdate = true;
-    } else {
-      const clampedWeeklyGoal = Math.max(1, Math.floor(migrated.weeklyGoalRepetitions));
-      if (clampedWeeklyGoal !== migrated.weeklyGoalRepetitions) {
-        migrated.weeklyGoalRepetitions = clampedWeeklyGoal;
-        needsUpdate = true;
-      }
     }
 
     if (!migrated.cycleDays || !Number.isFinite(migrated.cycleDays) || migrated.cycleDays < 1) {
@@ -241,21 +236,15 @@ export default function Index() {
 
   const weeklyGoalRepetitions = Math.max(
     1,
-    settings.weeklyGoalRepetitions || (settings.scales.length * settings.repetitionsRequired)
+    settings.scales.length * settings.repetitionsRequired
   );
   const cycleDays = settings.cycleDays || 7;
   const today = new Date();
-  const todayStart = getStartOfDay(today);
-  const cycleStart = getStartOfDay(
-    practiceState.cycleStartDate ? parseLocalDate(practiceState.cycleStartDate) : today
-  );
-  const elapsedDays = Math.floor((todayStart.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const currentDayOfCycle = Math.min(cycleDays, Math.max(1, elapsedDays));
-
   const todayDayKey = getDayKey(today);
   const todayCompletedRepetitions = dailyRepetitions[todayDayKey] || 0;
 
   const {
+    currentDayOfCycle,
     dailyTargetRepetitions,
     dailyRemainingRepetitions,
     dailyTargetDisplay,
@@ -266,14 +255,15 @@ export default function Index() {
     weeklyCompletedRepetitions,
     todayCompletedRepetitions,
     cycleDays,
-    currentDayOfCycle,
+    cycleStartDate: practiceState.cycleStartDate,
+    today,
   });
 
   const allCompleted = useMemo(
     () =>
       practiceState.scaleProgress.length > 0 &&
-      practiceState.scaleProgress.every((s) => s.completed),
-    [practiceState.scaleProgress]
+      practiceState.scaleProgress.every((s) => s.successCount >= settings.repetitionsRequired),
+    [practiceState.scaleProgress, settings.repetitionsRequired]
   );
 
   const fireConfetti = useCallback(() => {
@@ -416,8 +406,13 @@ export default function Index() {
     (newCycleDays: number) => {
       recentFingerPatternsRef.current = [];
       setGoalModalDismissed(false);
-      setRawSettings((prev) => ({ ...prev, cycleDays: newCycleDays }));
-      setPracticeState(initializePracticeState({ ...settings, cycleDays: newCycleDays }));
+      const updatedSettings = {
+        ...settings,
+        cycleDays: newCycleDays,
+        weeklyGoalRepetitions: settings.scales.length * settings.repetitionsRequired,
+      };
+      setRawSettings(updatedSettings);
+      setPracticeState(initializePracticeState(updatedSettings));
       setDailyRepetitions({});
       setDailyGoalCelebrations({});
     },
@@ -426,7 +421,10 @@ export default function Index() {
 
   const handleSettingsChange = useCallback(
     (newSettings: PracticeSettings) => {
-      setRawSettings(newSettings);
+      setRawSettings({
+        ...newSettings,
+        weeklyGoalRepetitions: newSettings.scales.length * newSettings.repetitionsRequired,
+      });
     },
     [setRawSettings]
   );
@@ -524,7 +522,7 @@ export default function Index() {
                   <h1 className="text-3xl font-bold text-foreground">Scaled</h1>
                   <div className="w-64 mx-auto space-y-2 mt-2">
                     <Progress
-                      value={(weeklyCompletedRepetitions / weeklyGoalRepetitions) * 100}
+                      value={dailyTargetDisplay > 0 ? (todayPaceProgressDisplay / dailyTargetDisplay) * 100 : 100}
                       className="h-1.5 bg-secondary"
                     />
                     <p className="text-xs text-muted-foreground">

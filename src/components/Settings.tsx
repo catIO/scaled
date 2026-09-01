@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { MdSettings, MdAdd, MdDelete, MdFileUpload, MdFileDownload } from 'react-icons/md';
 import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
-import { getLocalDateString } from '@/lib/dateUtils';
+import { getLocalDateString, getElapsedDays } from '@/lib/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -47,16 +47,18 @@ import { PracticeSettings, PracticeState } from '@/types/practice';
 const AVAILABLE_FINGER_PATTERNS = ['i-m', 'm-i', 'm-a', 'a-m', 'i-a', 'a-i', 'a-m-i'] as const;
 
 // Helper function to check if imported file is valid
-const isValidBackup = (data: any): data is { settings: PracticeSettings; practiceState: PracticeState } => {
+const isValidBackup = (data: unknown): data is { settings: PracticeSettings; practiceState: PracticeState } => {
   if (!data || typeof data !== 'object') return false;
 
-  const { settings, practiceState } = data;
+  const dataObj = data as Record<string, unknown>;
+  const settings = dataObj.settings as PracticeSettings | undefined;
+  const practiceState = dataObj.practiceState as PracticeState | undefined;
   if (!settings || typeof settings !== 'object') return false;
   if (!practiceState || typeof practiceState !== 'object') return false;
 
   // Validate settings
   if (!Array.isArray(settings.scales)) return false;
-  if (!settings.scales.every((s: any) => typeof s === 'string')) return false;
+  if (!settings.scales.every((s: unknown) => typeof s === 'string')) return false;
   if (typeof settings.repetitionsRequired !== 'number' || settings.repetitionsRequired < 1) return false;
   if (settings.weeklyGoalRepetitions !== undefined && (typeof settings.weeklyGoalRepetitions !== 'number' || settings.weeklyGoalRepetitions < 1)) return false;
 
@@ -69,7 +71,7 @@ const isValidBackup = (data: any): data is { settings: PracticeSettings; practic
 
   if (settings.fingerPatterns !== undefined) {
     if (!Array.isArray(settings.fingerPatterns)) return false;
-    if (!settings.fingerPatterns.every((p: any) => typeof p === 'string')) return false;
+    if (!settings.fingerPatterns.every((p: unknown) => typeof p === 'string')) return false;
   }
 
   // Validate practiceState
@@ -82,7 +84,7 @@ const isValidBackup = (data: any): data is { settings: PracticeSettings; practic
     if (typeof progress.completed !== 'boolean') return false;
   }
   if (!Array.isArray(practiceState.practiceOrder)) return false;
-  if (!practiceState.practiceOrder.every((idx: any) => typeof idx === 'number')) return false;
+  if (!practiceState.practiceOrder.every((idx: unknown) => typeof idx === 'number')) return false;
 
   return true;
 };
@@ -124,6 +126,7 @@ export function Settings({
   const suggestedWeeklyGoal = settings.scales.length * settings.repetitionsRequired;
   const dailyTarget = suggestedWeeklyGoal / cycleDays;
   const dailyTargetRounded = Math.max(1, Math.ceil(dailyTarget));
+  const elapsedDays = getElapsedDays(practiceState.cycleStartDate);
 
   useEffect(() => {
     if (open) {
@@ -264,9 +267,11 @@ export function Settings({
     if (newScale.trim()) {
       const scaleNameWithOctaves = `${newScale.trim()} - ${octaves} Octave${octaves === '1' ? '' : 's'}`;
       if (!settings.scales.includes(scaleNameWithOctaves)) {
+        const newScales = [...settings.scales, scaleNameWithOctaves];
         onSettingsChange({
           ...settings,
-          scales: [...settings.scales, scaleNameWithOctaves],
+          scales: newScales,
+          weeklyGoalRepetitions: newScales.length * settings.repetitionsRequired,
         });
         setNewScale('');
         setOctaves('1');
@@ -275,9 +280,11 @@ export function Settings({
   };
 
   const removeScale = (scale: string) => {
+    const newScales = settings.scales.filter((s) => s !== scale);
     onSettingsChange({
       ...settings,
-      scales: settings.scales.filter((s) => s !== scale),
+      scales: newScales,
+      weeklyGoalRepetitions: newScales.length * settings.repetitionsRequired,
     });
   };
 
@@ -432,7 +439,11 @@ export function Settings({
                 <Slider
                   value={[settings.repetitionsRequired]}
                   onValueChange={([value]) =>
-                    onSettingsChange({ ...settings, repetitionsRequired: value })
+                    onSettingsChange({
+                      ...settings,
+                      repetitionsRequired: value,
+                      weeklyGoalRepetitions: settings.scales.length * value,
+                    })
                   }
                   min={1}
                   max={10}
@@ -451,7 +462,11 @@ export function Settings({
                 <Slider
                   value={[settings.cycleDays || 7]}
                   onValueChange={([value]) =>
-                    onSettingsChange({ ...settings, cycleDays: value })
+                    onSettingsChange({
+                      ...settings,
+                      cycleDays: value,
+                      weeklyGoalRepetitions: settings.scales.length * settings.repetitionsRequired,
+                    })
                   }
                   min={1}
                   max={30}
@@ -474,7 +489,9 @@ export function Settings({
               <div className="p-3 bg-muted/40 rounded-xl border border-border flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-foreground">Current Cycle</p>
-                  <p className="text-xs text-muted-foreground">Started: {practiceState.cycleStartDate || 'Today'}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Started: {practiceState.cycleStartDate || 'Today'} · Day {Math.min(elapsedDays, cycleDays)} of {cycleDays}
+                  </p>
                 </div>
                 <Button
                   size="sm"
