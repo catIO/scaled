@@ -1,18 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <style>
-    :root {
-      color-scheme: light dark;
-    }
-    rect {
-      fill: #000000;
-    }
-    @media (prefers-color-scheme: dark) {
-      rect {
-        fill: #FFFFFF;
-      }
-    }
-  </style>
-  <g>
+  <g fill="#000000">
     <rect x="80" y="300" width="88" height="176" rx="14"/>
     <rect x="212" y="168" width="88" height="308" rx="14"/>
     <rect x="344" y="36" width="88" height="440" rx="14"/>

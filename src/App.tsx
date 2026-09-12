@@ -6,6 +6,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 
 const Index = lazy(() => import("./pages/Index"));
 const About = lazy(() => import("./pages/About"));
@@ -13,9 +14,12 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <ErrorBoundary>
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+const App = () => {
+  useDynamicFavicon();
+
+  return (
+    <ErrorBoundary>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
@@ -35,5 +39,6 @@ const App = () => (
     </ThemeProvider>
   </ErrorBoundary>
 );
+};
 
 export default App;

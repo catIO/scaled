@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => ({
         enabled: false,
         type: "module",
       },
-      includeAssets: ["favicon.ico", "favicon.svg", "icon-192.png", "icon-512.png"],
+      includeAssets: ["favicon.ico", "favicon.svg", "favicon-light.svg", "favicon-dark.svg", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "Scaled",
         short_name: "Scaled",
