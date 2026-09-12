@@ -29,11 +29,7 @@ export interface PracticeState {
 }
 
 export const DEFAULT_SCALES = [
-  'G',
-  'E min Harmonic',
-  'E min Melodic',
-  'A min Harmonic',
-  'A min Melodic',
+  'C Major',
 ];
 
 export const DEFAULT_SETTINGS: PracticeSettings = {

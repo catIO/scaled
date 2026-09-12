@@ -1,9 +1,9 @@
 import { useState, lazy, Suspense } from 'react';
 import { ScaleProgress } from '@/types/practice';
-import { MdEdit, MdMusicNote } from 'react-icons/md';
+import { MdMusicNote } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { Sparkles, X } from 'lucide-react';
 import { SCALE_DICTIONARY, getBaseScaleName, getOctaveCount, generateMultiOctaveABC } from '@/lib/notation';
 
 const ScaleNotationModal = lazy(() =>
@@ -34,6 +34,9 @@ export function ProgressTracker({
   onOpenSettings,
 }: ProgressTrackerProps) {
   const [notationScale, setNotationScale] = useState<{ name: string, abc: string } | null>(null);
+  const [onboardingDismissed, setOnboardingDismissed] = useLocalStorage('scaled-starter-tip-dismissed', false);
+
+  const showStarterTip = !onboardingDismissed && scaleProgress.length <= 1;
 
   const weeklyProgressPct = weeklyGoalRepetitions
     ? (weeklyCompletedRepetitions / weeklyGoalRepetitions) * 100
@@ -43,29 +46,11 @@ export function ProgressTracker({
 
   return (
     <div className="w-full space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-m font-bold text-muted-foreground uppercase tracking-wider py-2">Progress</h3>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">
-            {weeklyCompletedRepetitions}/{weeklyGoalRepetitions}
-          </span>
-        </div>
-        {onOpenSettings && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onOpenSettings}
-                aria-label="Edit scales"
-                className={`${CONTROL_BUTTON_SIZE} rounded-xl hover:bg-muted p-0 flex items-center justify-center`}
-              >
-                <MdEdit className={`${CONTROL_ICON_SIZE} text-foreground`} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Edit scales</TooltipContent>
-          </Tooltip>
-        )}
+      <div className="flex items-center justify-between py-1">
+        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Progress</h3>
+        <span className="text-xs font-medium text-muted-foreground">
+          {weeklyCompletedRepetitions}/{weeklyGoalRepetitions}
+        </span>
       </div>
 
       <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -138,6 +123,40 @@ export function ProgressTracker({
           );
         })}
       </div>
+
+      {showStarterTip && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Get Started</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOnboardingDismissed(true)}
+              className="text-muted-foreground hover:text-foreground cursor-pointer p-0.5 rounded"
+              aria-label="Dismiss tip"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            We loaded <strong>C Major</strong> as your starter scale. Add, remove, and organize all your scales anytime in <strong>Settings</strong>.
+          </p>
+          {onOpenSettings && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onOpenSettings}
+              className="w-full text-xs h-8"
+            >
+              Customize Scales
+            </Button>
+          )}
+        </div>
+      )}
+
       {notationScale && (
         <Suspense fallback={null}>
           <ScaleNotationModal

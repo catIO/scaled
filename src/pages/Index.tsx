@@ -1,6 +1,9 @@
 import { useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Info, ExternalLink, Music } from 'lucide-react';
+import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { Progress } from '@/components/ui/progress';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useMetronome } from '@/hooks/useMetronome';
@@ -9,6 +12,7 @@ import { ProgressTracker } from '@/components/ProgressTracker';
 import { MetronomeIndicator } from '@/components/MetronomeIndicator';
 import { Settings } from '@/components/Settings';
 import { GoalAchievementModal } from '@/components/GoalAchievementModal';
+import { AboutModal } from '@/components/AboutModal';
 import {
   PracticeSettings,
   PracticeState,
@@ -195,6 +199,7 @@ export default function Index() {
 
   const { isPlaying, toggle } = useMetronome(settings.metronome);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<'scales' | 'goals' | 'fingers'>('goals');
   const [isAcceptPending, setIsAcceptPending] = useState(false);
   const [goalModalDismissed, setGoalModalDismissed] = useState(false);
@@ -524,37 +529,54 @@ export default function Index() {
     <div className="min-h-screen bg-background p-4 flex flex-col">
       <div className="flex-1 flex items-center justify-center">
         {/* Main Container Box */}
-        <div className="w-full max-w-6xl bg-card rounded-2xl border border-border material-shadow-xl relative">
-          {/* Top Left Controls */}
-          <div className="absolute top-4 left-4 flex items-center gap-2 bg-card rounded-2xl p-1 border border-border z-10">
-            <MetronomeIndicator
-              settings={settings.metronome}
-              isPlaying={isPlaying}
-              onToggle={toggle}
-              onSettingsChange={(updates) => {
-                setRawSettings({
-                  ...settings,
-                  metronome: { ...settings.metronome, ...updates },
-                });
-              }}
-            />
-            <Settings
-              settings={settings}
-              onSettingsChange={handleSettingsChange}
-              onReset={handleReset}
-              onStartNewCycle={handleStartNewCycle}
-              open={settingsOpen}
-              onOpenChange={setSettingsOpen}
-              practiceState={practiceState}
-              onImport={handleImport}
-              initialTab={settingsInitialTab}
-              onGearClick={() => setSettingsInitialTab('goals')}
-            />
-          </div>
+        <div className="w-full max-w-5xl bg-card rounded-2xl border border-border material-shadow-xl relative">
+          {/* Top Header Bar */}
+          <header className="px-6 pt-6 pb-2 flex items-center justify-between">
+            {/* Top Left Controls - Metronome */}
+            <div className="flex items-center gap-2 bg-card rounded-2xl p-1 border border-border">
+              <MetronomeIndicator
+                settings={settings.metronome}
+                isPlaying={isPlaying}
+                onToggle={toggle}
+                onSettingsChange={(updates) => {
+                  setRawSettings({
+                    ...settings,
+                    metronome: { ...settings.metronome, ...updates },
+                  });
+                }}
+              />
+            </div>
+
+            {/* Top Right Controls - About & Settings */}
+            <div className="flex items-center gap-2 bg-card rounded-2xl p-1 border border-border">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="About Scaled and How to Use"
+                onClick={() => setAboutOpen(true)}
+                className={`${CONTROL_BUTTON_SIZE} rounded-xl hover:bg-muted p-0 flex items-center justify-center`}
+              >
+                <Info className={`${CONTROL_ICON_SIZE} text-foreground`} />
+              </Button>
+              <Settings
+                settings={settings}
+                onSettingsChange={handleSettingsChange}
+                onReset={handleReset}
+                onStartNewCycle={handleStartNewCycle}
+                open={settingsOpen}
+                onOpenChange={setSettingsOpen}
+                practiceState={practiceState}
+                onImport={handleImport}
+                initialTab={settingsInitialTab}
+                onGearClick={() => setSettingsInitialTab('goals')}
+                onOpenAbout={() => setAboutOpen(true)}
+              />
+            </div>
+          </header>
 
           {/* Main Content */}
-          <main className="p-8 pt-20">
-            <div className="grid lg:grid-cols-[1fr,320px] gap-8 items-start">
+          <main className="p-6 md:p-8 pt-4">
+            <div className="grid lg:grid-cols-[1fr,320px] gap-6 lg:gap-8 items-start">
               {/* Center Section - Current Scale */}
               <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
                 {/* Title */}
@@ -584,7 +606,29 @@ export default function Index() {
                     fingerCombination={chosenFingerPattern}
                     fingerPatterns={settings.fingerPatterns}
                   />
-                ) : null}
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-8 text-center space-y-4 max-w-sm bg-muted/20 border border-border rounded-2xl animate-fade-in">
+                    <div className="p-3 rounded-xl bg-primary/10 text-primary">
+                      <Music className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-base font-semibold text-foreground">No scales in practice list</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Add scales in Settings to set up your practice syllabus.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSettingsInitialTab('scales');
+                        setSettingsOpen(true);
+                      }}
+                      className="text-xs"
+                    >
+                      Add Scales
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Sidebar - Progress Tracker */}
@@ -618,17 +662,29 @@ export default function Index() {
         currentCycleDays={settings.cycleDays || 7}
       />
 
-      <footer className="pt-4 text-xs text-muted-foreground flex items-center justify-center gap-6">
-        <Link to="/about" className="text-primary underline hover:text-primary/90">
-          About + How to Use
-        </Link>
+      <AboutModal
+        isOpen={aboutOpen}
+        onClose={() => setAboutOpen(false)}
+      />
+
+      <footer className="pt-4 pb-2 text-xs text-muted-foreground flex items-center justify-center gap-5">
+        <button
+          type="button"
+          onClick={() => setAboutOpen(true)}
+          className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors cursor-pointer text-muted-foreground"
+        >
+          <Info className="w-3.5 h-3.5" />
+          <span>About Scaled</span>
+        </button>
+        <span className="text-border" aria-hidden="true">•</span>
         <a
-          href="https://practice-mate.app/"
+          href="https://practice-lab.net/"
           target="_blank"
           rel="noreferrer"
-          className="text-primary underline hover:text-primary/90"
+          className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors text-muted-foreground"
         >
-          More Apps
+          <span>Practice Lab Suite</span>
+          <ExternalLink className="w-3 h-3 opacity-70" />
         </a>
       </footer>
     </div>

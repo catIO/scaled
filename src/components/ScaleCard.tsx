@@ -55,7 +55,7 @@ export function ScaleCard({
     fingerCombinationProp !== undefined ? fingerCombinationProp : localFingerCombination;
 
   return (
-    <div className="w-full max-w-md animate-scale-in">
+    <div className="w-full max-w-lg animate-scale-in">
       <div className="bg-muted rounded-2xl material-shadow-xl p-8 text-center space-y-6">
         <button
           onClick={() => notation && setShowNotation(true)}

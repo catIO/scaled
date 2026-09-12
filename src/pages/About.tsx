@@ -26,17 +26,17 @@ export default function About() {
                     </section>
 
                     <section className="space-y-3">
-                        <h2 className="text-xl font-semibold text-foreground">More Practice Apps</h2>
+                        <h2 className="text-xl font-semibold text-foreground">Practice Lab Suite</h2>
                         <p className="text-sm text-muted-foreground">
-                            Explore your full collection of music practice apps on Practice Mate.
+                            Explore our full collection of music practice apps on Practice Lab.
                         </p>
                         <a
-                            href="https://practice-mate.app/"
+                            href="https://practice-lab.net/"
                             target="_blank"
                             rel="noreferrer"
-                            className="text-sm text-primary underline hover:text-primary/90"
+                            className="inline-flex items-center gap-1.5 text-sm text-primary underline hover:text-primary/90"
                         >
-                            Visit practice-mate.app
+                            <span>Visit practice-lab.net</span>
                         </a>
                     </section>
                 </main>

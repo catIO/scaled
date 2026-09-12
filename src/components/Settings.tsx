@@ -40,7 +40,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Info, ExternalLink } from "lucide-react";
 import { UNIQUE_SCALE_NAMES } from '@/lib/notation';
 import { PracticeSettings, PracticeState } from '@/types/practice';
 
@@ -100,6 +100,7 @@ interface SettingsProps {
   onImport: (settings: PracticeSettings, state: PracticeState) => void;
   initialTab?: 'scales' | 'goals' | 'fingers';
   onGearClick?: () => void;
+  onOpenAbout?: () => void;
 }
 
 export function Settings({
@@ -113,6 +114,7 @@ export function Settings({
   onImport,
   initialTab,
   onGearClick,
+  onOpenAbout,
 }: SettingsProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -590,6 +592,33 @@ export function Settings({
             </div>
           </TabsContent>
         </Tabs>
+
+        <div className="border-t border-border pt-4 mt-2 flex items-center justify-between text-xs text-muted-foreground">
+          {onOpenAbout ? (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onOpenAbout();
+              }}
+              className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors cursor-pointer"
+            >
+              <Info className="w-3.5 h-3.5" />
+              <span>About Scaled & Guide</span>
+            </button>
+          ) : (
+            <span />
+          )}
+          <a
+            href="https://practice-lab.net/"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+          >
+            <span>Practice Lab Suite</span>
+            <ExternalLink className="w-3 h-3 opacity-70" />
+          </a>
+        </div>
 
         <input
           type="file"
