@@ -19,9 +19,9 @@ interface ProgressTrackerProps {
   currentScale: string;
   currentScaleIndex: number;
   practiceOrder: number[];
-  streak: number;
   round?: number;
   onOpenSettings?: () => void;
+  streak?: number;
 }
 
 export function ProgressTracker({
@@ -31,9 +31,9 @@ export function ProgressTracker({
   currentScale,
   currentScaleIndex,
   practiceOrder,
-  streak,
   round = 1,
   onOpenSettings,
+  streak = 0,
 }: ProgressTrackerProps) {
   const [notationScale, setNotationScale] = useState<{ name: string; abc: string } | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useLocalStorage('scaled-starter-tip-dismissed', false);
@@ -58,13 +58,20 @@ export function ProgressTracker({
               Daily Goal
             </h3>
             {streak > 0 && (
-              <div
-                className="flex items-center gap-1 text-xs font-semibold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full"
-                title={`${streak} day daily goal streak`}
-              >
-                <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                <span>{streak} {streak === 1 ? 'day' : 'days'}</span>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-semibold text-xs select-none cursor-default"
+                    aria-label={`${streak} day daily goal streak`}
+                  >
+                    <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                    <span>{streak} {streak === 1 ? 'day' : 'days'}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center">
+                  {streak} day daily goal streak
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
           <span className="text-xs font-medium text-muted-foreground">
@@ -102,8 +109,10 @@ export function ProgressTracker({
               }
             : null;
 
-          const weeklyCompletions = getScaleWeeklyCompletions(scale.history);
-          const isScaleCompleted = weeklyCompletions >= 7;
+          const weeklyCompletions = scale.history
+            ? Math.max(getScaleWeeklyCompletions(scale.history), scale.successCount || 0)
+            : (scale.successCount || 0);
+          const isScaleCompleted = scale.completed || weeklyCompletions >= 7;
           const progress = (weeklyCompletions / 7) * 100;
 
           return (

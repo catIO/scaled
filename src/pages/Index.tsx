@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Button } from '@/components/ui/button';
-import { Info, ExternalLink, Music, Flame } from 'lucide-react';
+import { Info, ExternalLink, Music } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { Progress } from '@/components/ui/progress';
@@ -22,6 +22,8 @@ import { getNextFingerCombination } from '@/lib/fingerCombinations';
 import {
   getDayKey,
   calculateDailyStreak,
+  deriveDailyRepetitions,
+  migrateLegacyBackup,
   getScaleWeeklyCompletions,
   getElapsedDays,
   getLocalDateString,
@@ -290,10 +292,10 @@ export default function Index() {
   const elapsedDays = getElapsedDays(practiceState.cycleStartDate, today);
   const currentDayOfCycle = Math.min(cycleDays, elapsedDays);
   const streak = calculateDailyStreak(dailyRepetitions, dailyGoal, today);
-  const currentScaleWeeklyCompletions = useMemo(
-    () => getScaleWeeklyCompletions(currentScale?.history),
-    [currentScale?.history]
-  );
+  const currentScaleWeeklyCompletions = useMemo(() => {
+    const fromHist = getScaleWeeklyCompletions(currentScale?.history);
+    return Math.max(fromHist, currentScale?.successCount || 0);
+  }, [currentScale?.history, currentScale?.successCount]);
 
   const fireConfetti = useCallback(() => {
     confetti({
@@ -324,6 +326,35 @@ export default function Index() {
     todayDayKey,
     todayCompleted,
   ]);
+
+  // Reconcile dailyRepetitions and scale history with practiceState (recovers completions on reload or after legacy import)
+  useEffect(() => {
+    const needsMigration = practiceState.scaleProgress.some(
+      (s) => (s.successCount || 0) > 0 && (!s.history || Object.keys(s.history).length === 0)
+    );
+
+    if (needsMigration) {
+      const migrated = migrateLegacyBackup(
+        settings as PracticeSettings & Record<string, unknown>,
+        practiceState as PracticeState & Record<string, unknown>,
+        today
+      );
+      setPracticeState(migrated.practiceState);
+      setDailyRepetitions(migrated.dailyRepetitions);
+      return;
+    }
+
+    const derived = deriveDailyRepetitions(
+      practiceState.scaleProgress,
+      dailyRepetitions
+    );
+    const hasMissingData = Object.entries(derived).some(
+      ([key, count]) => (dailyRepetitions[key] || 0) < count
+    );
+    if (hasMissingData) {
+      setDailyRepetitions(derived);
+    }
+  }, [practiceState, dailyRepetitions, settings, setPracticeState, setDailyRepetitions, today]);
 
   const moveToNextScale = useCallback(() => {
     setPracticeState((prev) => {
@@ -457,14 +488,58 @@ export default function Index() {
   );
 
   const handleImport = useCallback(
-    (importedSettings: PracticeSettings, importedState: PracticeState) => {
-      prevScalesRef.current = importedSettings.scales;
-      setRawSettings(importedSettings);
-      setPracticeState(importedState);
-      setDailyRepetitions({});
-      setDailyGoalCelebrations({});
+    (
+      importedSettings: PracticeSettings,
+      importedState: PracticeState,
+      importedDailyRepetitions?: Record<string, number>,
+      rawStreak?: number
+    ) => {
+      // Migrate legacy backup format from deployed versions if needed
+      const migrated = migrateLegacyBackup(
+        importedSettings as PracticeSettings & Record<string, unknown>,
+        importedState as PracticeState & Record<string, unknown>,
+        today
+      );
+
+      prevScalesRef.current = migrated.settings.scales;
+      setRawSettings(migrated.settings);
+      setPracticeState(migrated.practiceState);
+
+      const restoredDailyRepetitions = deriveDailyRepetitions(
+        migrated.practiceState.scaleProgress,
+        importedDailyRepetitions || migrated.dailyRepetitions
+      );
+
+      // If a streak count was explicitly provided but dates weren't recent,
+      // populate the missing consecutive days ending yesterday.
+      if (typeof rawStreak === 'number' && rawStreak > 0) {
+        const goal = migrated.settings.dailyGoal || 10;
+        const currentStreak = calculateDailyStreak(restoredDailyRepetitions, goal, today);
+        if (currentStreak < rawStreak) {
+          const check = new Date(today);
+          for (let i = 0; i < rawStreak; i++) {
+            check.setDate(check.getDate() - 1);
+            const key = getDayKey(check);
+            if ((restoredDailyRepetitions[key] || 0) < goal) {
+              restoredDailyRepetitions[key] = goal;
+            }
+          }
+        }
+      }
+
+      setDailyRepetitions(restoredDailyRepetitions);
+
+      // Restore celebrations for completed days
+      const celebrations: Record<string, boolean> = {};
+      const goal = migrated.settings.dailyGoal || 10;
+      for (const [dayKey, count] of Object.entries(restoredDailyRepetitions)) {
+        if (count >= goal) {
+          celebrations[dayKey] = true;
+        }
+      }
+      setDailyGoalCelebrations(celebrations);
     },
-    [setDailyGoalCelebrations, setDailyRepetitions, setRawSettings, setPracticeState]
+    [setDailyGoalCelebrations, setDailyRepetitions, setRawSettings, setPracticeState, today]
   );
 
   // Cleanup pending navigation on unmount
@@ -548,6 +623,7 @@ export default function Index() {
                 open={settingsOpen}
                 onOpenChange={setSettingsOpen}
                 practiceState={practiceState}
+                dailyRepetitions={dailyRepetitions}
                 onImport={handleImport}
                 initialTab={settingsInitialTab}
                 onGearClick={() => setSettingsInitialTab('goals')}
@@ -573,12 +649,6 @@ export default function Index() {
                       <span>
                         Day {currentDayOfCycle} of {cycleDays} · {todayCompleted} of {dailyGoal} daily scales completed
                       </span>
-                      {streak > 0 && (
-                        <span className="inline-flex items-center gap-1 font-semibold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full text-[11px]">
-                          <Flame className="w-3 h-3 fill-amber-500 text-amber-500" />
-                          <span>{streak} {streak === 1 ? 'day' : 'days'}</span>
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -631,8 +701,8 @@ export default function Index() {
                   currentScale={currentScale?.name || ''}
                   currentScaleIndex={practiceState.currentScaleIndex}
                   practiceOrder={practiceState.practiceOrder}
-                  streak={streak}
                   round={practiceState.round || 1}
+                  streak={streak}
                   onOpenSettings={() => {
                     setSettingsInitialTab('scales');
                     setSettingsOpen(true);

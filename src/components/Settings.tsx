@@ -47,7 +47,16 @@ import { PracticeSettings, PracticeState } from '@/types/practice';
 const AVAILABLE_FINGER_PATTERNS = ['i-m', 'm-i', 'm-a', 'a-m', 'i-a', 'a-i', 'a-m-i'] as const;
 
 // Helper function to check if imported file is valid
-const isValidBackup = (data: unknown): data is { settings: PracticeSettings; practiceState: PracticeState } => {
+interface BackupData {
+  version?: number;
+  settings: PracticeSettings;
+  practiceState: PracticeState;
+  dailyRepetitions?: Record<string, number>;
+  streak?: number;
+  completedDays?: number;
+}
+
+const isValidBackup = (data: unknown): data is BackupData => {
   if (!data || typeof data !== 'object') return false;
 
   const dataObj = data as Record<string, unknown>;
@@ -90,7 +99,13 @@ interface SettingsProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   practiceState: PracticeState;
-  onImport: (settings: PracticeSettings, state: PracticeState) => void;
+  dailyRepetitions?: Record<string, number>;
+  onImport: (
+    settings: PracticeSettings,
+    state: PracticeState,
+    dailyRepetitions?: Record<string, number>,
+    streak?: number
+  ) => void;
   initialTab?: 'scales' | 'goals' | 'fingers';
   onGearClick?: () => void;
   onOpenAbout?: () => void;
@@ -104,6 +119,7 @@ export function Settings({
   open: controlledOpen,
   onOpenChange,
   practiceState,
+  dailyRepetitions,
   onImport,
   initialTab,
   onGearClick,
@@ -129,10 +145,11 @@ export function Settings({
 
   const handleExport = () => {
     try {
-      const exportData = {
+      const exportData: BackupData = {
         version: 1,
         settings,
         practiceState,
+        dailyRepetitions: dailyRepetitions || {},
       };
       const jsonString = JSON.stringify(exportData, null, 2);
       const blob = new Blob([jsonString], { type: 'application/json' });
@@ -177,6 +194,10 @@ export function Settings({
 
         if (isValidBackup(json)) {
           const { settings: importedSettings, practiceState: importedState } = json;
+          const importedDailyRepetitions = json.dailyRepetitions;
+          const rawStreak = typeof json.streak === 'number'
+            ? json.streak
+            : (typeof json.completedDays === 'number' ? json.completedDays : undefined);
 
           // Fallback check for finger patterns if undefined
           if (!importedSettings.fingerPatterns) {
@@ -229,7 +250,7 @@ export function Settings({
             return;
           }
 
-          onImport(importedSettings, importedState);
+          onImport(importedSettings, importedState, importedDailyRepetitions, rawStreak);
           setOpen(false);
 
           toast({
