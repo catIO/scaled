@@ -1,8 +1,8 @@
 import { useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Info, ExternalLink, Music } from 'lucide-react';
+import { Info, ExternalLink, Music, Flame } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { Progress } from '@/components/ui/progress';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -11,7 +11,6 @@ import { ScaleCard } from '@/components/ScaleCard';
 import { ProgressTracker } from '@/components/ProgressTracker';
 import { MetronomeIndicator } from '@/components/MetronomeIndicator';
 import { Settings } from '@/components/Settings';
-import { GoalAchievementModal } from '@/components/GoalAchievementModal';
 import { AboutModal } from '@/components/AboutModal';
 import {
   PracticeSettings,
@@ -21,11 +20,11 @@ import {
 } from '@/types/practice';
 import { getNextFingerCombination } from '@/lib/fingerCombinations';
 import {
-  getStartOfDay,
   getDayKey,
+  calculateDailyStreak,
+  getScaleWeeklyCompletions,
+  getElapsedDays,
   getLocalDateString,
-  parseLocalDate,
-  calculateDailyGoal,
 } from '@/lib/dateUtils';
 
 // Shuffle array using Fisher-Yates
@@ -39,37 +38,32 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
- * Shuffles scale indices [0..totalScales-1] while ensuring that scales played
- * near the end of the previous round are not played at the start of the next round.
+ * Generates an order for the next round that avoids repeating recent scales from the end of the previous round.
  */
-function generateNextRoundOrder(totalScales: number, previousOrder: number[] = []): number[] {
-  if (totalScales <= 1) return [0];
-  if (totalScales === 2) {
-    const lastScale = previousOrder[previousOrder.length - 1];
-    return lastScale === 0 ? [1, 0] : [0, 1];
+function generateNextRoundOrder(
+  scaleCount: number,
+  previousOrder: number[],
+  bufferSize: number = 2
+): number[] {
+  if (scaleCount <= 1) {
+    return [0];
   }
 
-  const baseIndices = Array.from({ length: totalScales }, (_, i) => i);
-  let maxBuffer = Math.min(Math.floor(totalScales / 2), 4);
+  const baseIndices = Array.from({ length: scaleCount }, (_, i) => i);
+  let maxBuffer = Math.min(bufferSize, Math.floor(scaleCount / 2));
 
   while (maxBuffer > 0) {
-    const recentEnd = previousOrder.slice(-maxBuffer);
-    for (let attempt = 0; attempt < 50; attempt++) {
+    const recentTail = new Set(previousOrder.slice(-maxBuffer));
+
+    for (let attempts = 0; attempts < 30; attempts++) {
       const candidate = shuffleArray(baseIndices);
       let valid = true;
-
-      for (let i = 0; i < candidate.length && i < maxBuffer; i++) {
-        const scale = candidate[i];
-        const recentIndex = recentEnd.lastIndexOf(scale);
-        if (recentIndex !== -1) {
-          const distance = (recentEnd.length - 1 - recentIndex) + 1 + i;
-          if (distance <= maxBuffer) {
-            valid = false;
-            break;
-          }
+      for (let i = 0; i < maxBuffer; i++) {
+        if (recentTail.has(candidate[i])) {
+          valid = false;
+          break;
         }
       }
-
       if (valid) {
         return candidate;
       }
@@ -95,6 +89,7 @@ function initializePracticeState(settings: PracticeSettings): PracticeState {
     currentScaleIndex: 0,
     scaleProgress,
     practiceOrder,
+    round: 1,
     cycleStartDate: getLocalDateString(),
   };
 }
@@ -107,17 +102,40 @@ export default function Index() {
     DEFAULT_SETTINGS
   );
 
-  // Migrate old settings and ensure fingerPatterns is properly initialized
+  // Migrate old settings and ensure fingerPatterns and dailyGoal are properly initialized
   const settings = useMemo(() => {
-    const migrated: PracticeSettings & { fingerCombinations?: unknown } = {
+    const migrated: PracticeSettings & {
+      fingerCombinations?: unknown;
+      repetitionsRequired?: unknown;
+      weeklyGoalRepetitions?: unknown;
+      cycleDays?: unknown;
+    } = {
       ...rawSettings,
     };
     let needsUpdate = false;
     const validSubdivisions = [1, 2, 3, 4];
 
-    // Remove old fingerCombinations property if it exists
+    // Remove legacy properties if they exist
     if ('fingerCombinations' in migrated) {
       delete migrated.fingerCombinations;
+      needsUpdate = true;
+    }
+    if ('repetitionsRequired' in migrated) {
+      delete migrated.repetitionsRequired;
+      needsUpdate = true;
+    }
+    if ('weeklyGoalRepetitions' in migrated) {
+      delete migrated.weeklyGoalRepetitions;
+      needsUpdate = true;
+    }
+
+    if (!migrated.cycleDays || !Number.isFinite(migrated.cycleDays) || migrated.cycleDays < 1) {
+      migrated.cycleDays = 7;
+      needsUpdate = true;
+    }
+
+    if (!migrated.dailyGoal || !Number.isFinite(migrated.dailyGoal) || migrated.dailyGoal < 1) {
+      migrated.dailyGoal = 10;
       needsUpdate = true;
     }
 
@@ -160,18 +178,6 @@ export default function Index() {
       }
     }
 
-    // Always keep weeklyGoalRepetitions in sync with scales * repetitionsRequired
-    const expectedWeeklyGoal = Math.max(1, migrated.scales.length * migrated.repetitionsRequired);
-    if (migrated.weeklyGoalRepetitions !== expectedWeeklyGoal) {
-      migrated.weeklyGoalRepetitions = expectedWeeklyGoal;
-      needsUpdate = true;
-    }
-
-    if (!migrated.cycleDays || !Number.isFinite(migrated.cycleDays) || migrated.cycleDays < 1) {
-      migrated.cycleDays = 7;
-      needsUpdate = true;
-    }
-
     // If migration was needed, update immediately
     if (needsUpdate) {
       setRawSettings(migrated);
@@ -202,7 +208,6 @@ export default function Index() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<'scales' | 'goals' | 'fingers'>('goals');
   const [isAcceptPending, setIsAcceptPending] = useState(false);
-  const [goalModalDismissed, setGoalModalDismissed] = useState(false);
 
   // Track pending navigation to prevent race conditions
   const pendingNavigationRef = useRef<number | null>(null);
@@ -249,6 +254,7 @@ export default function Index() {
         currentScaleIndex: 0,
         scaleProgress: newScaleProgress,
         practiceOrder: newPracticeOrder,
+        round: prev.round || 1,
       };
     });
   }, [settings.scales, setPracticeState]);
@@ -276,41 +282,17 @@ export default function Index() {
     }
   }, [currentScale?.name, settings.fingerPatterns]);
 
-  const weeklyCompletedRepetitions = useMemo(
-    () => practiceState.scaleProgress.reduce((acc, s) => acc + s.successCount, 0),
-    [practiceState.scaleProgress]
-  );
-
-  const weeklyGoalRepetitions = Math.max(
-    1,
-    settings.scales.length * settings.repetitionsRequired
-  );
-  const cycleDays = settings.cycleDays || 7;
   const today = new Date();
   const todayDayKey = getDayKey(today);
-  const todayCompletedRepetitions = dailyRepetitions[todayDayKey] || 0;
-
-  const {
-    currentDayOfCycle,
-    dailyTargetRepetitions,
-    dailyRemainingRepetitions,
-    dailyTargetDisplay,
-    todayPaceProgressDisplay,
-    isOnDailyPace,
-  } = calculateDailyGoal({
-    weeklyGoalRepetitions,
-    weeklyCompletedRepetitions,
-    todayCompletedRepetitions,
-    cycleDays,
-    cycleStartDate: practiceState.cycleStartDate,
-    today,
-  });
-
-  const allCompleted = useMemo(
-    () =>
-      practiceState.scaleProgress.length > 0 &&
-      practiceState.scaleProgress.every((s) => s.successCount >= settings.repetitionsRequired),
-    [practiceState.scaleProgress, settings.repetitionsRequired]
+  const todayCompleted = dailyRepetitions[todayDayKey] || 0;
+  const dailyGoal = settings.dailyGoal || 10;
+  const cycleDays = settings.cycleDays || 7;
+  const elapsedDays = getElapsedDays(practiceState.cycleStartDate, today);
+  const currentDayOfCycle = Math.min(cycleDays, elapsedDays);
+  const streak = calculateDailyStreak(dailyRepetitions, dailyGoal, today);
+  const currentScaleWeeklyCompletions = useMemo(
+    () => getScaleWeeklyCompletions(currentScale?.history),
+    [currentScale?.history]
   );
 
   const fireConfetti = useCallback(() => {
@@ -325,9 +307,9 @@ export default function Index() {
   useEffect(() => {
     const celebrationKey = todayDayKey;
     const alreadyCelebrated = dailyGoalCelebrations[celebrationKey];
-    const reachedDailyPace = todayCompletedRepetitions >= dailyTargetRepetitions;
+    const reachedDailyGoal = todayCompleted >= dailyGoal;
 
-    if (!alreadyCelebrated && reachedDailyPace) {
+    if (!alreadyCelebrated && reachedDailyGoal) {
       fireConfetti();
       setDailyGoalCelebrations((prev) => ({
         ...prev,
@@ -335,20 +317,13 @@ export default function Index() {
       }));
     }
   }, [
-    dailyTargetRepetitions,
+    dailyGoal,
     dailyGoalCelebrations,
     fireConfetti,
     setDailyGoalCelebrations,
     todayDayKey,
-    todayCompletedRepetitions,
+    todayCompleted,
   ]);
-
-  // Celebrate goal completion when all exercises are finished
-  useEffect(() => {
-    if (allCompleted && !goalModalDismissed) {
-      fireConfetti();
-    }
-  }, [allCompleted, goalModalDismissed, fireConfetti]);
 
   const moveToNextScale = useCallback(() => {
     setPracticeState((prev) => {
@@ -361,10 +336,15 @@ export default function Index() {
       }
 
       const newPracticeOrder = generateNextRoundOrder(total, prev.practiceOrder);
+      toast({
+        title: "Cycle Completed",
+        description: "All scales have been played! Reshuffling for a new cycle.",
+      });
       return {
         ...prev,
         practiceOrder: newPracticeOrder,
         currentScaleIndex: 0,
+        round: (prev.round || 1) + 1,
       };
     });
   }, [setPracticeState]);
@@ -391,12 +371,14 @@ export default function Index() {
       didAccept = true;
 
       const newCount = scale.successCount + 1;
-      const isNowCompleted = newCount >= settings.repetitionsRequired;
+      const currentHistory = { ...(scale.history || {}) };
+      currentHistory[todayDayKey] = (currentHistory[todayDayKey] || 0) + 1;
 
       newProgress[orderIndex] = {
         ...scale,
         successCount: newCount,
-        completed: isNowCompleted,
+        completed: true,
+        history: currentHistory,
       };
 
       return { ...prev, scaleProgress: newProgress };
@@ -433,7 +415,7 @@ export default function Index() {
         acceptUnlockTimeoutRef.current = null;
       }, remainingLock);
     }, 500);
-  }, [settings.repetitionsRequired, moveToNextScale, setDailyRepetitions, setPracticeState, todayDayKey]);
+  }, [moveToNextScale, setDailyRepetitions, setPracticeState, todayDayKey]);
 
   const handleDecline = useCallback(() => {
     moveToNextScale();
@@ -441,7 +423,6 @@ export default function Index() {
 
   const handleReset = useCallback(() => {
     recentFingerPatternsRef.current = [];
-    setGoalModalDismissed(false);
     setPracticeState(initializePracticeState(settings));
     setDailyRepetitions({});
     setDailyGoalCelebrations({});
@@ -450,26 +431,27 @@ export default function Index() {
   const handleStartNewCycle = useCallback(
     (newCycleDays: number) => {
       recentFingerPatternsRef.current = [];
-      setGoalModalDismissed(false);
-      const updatedSettings = {
-        ...settings,
-        cycleDays: newCycleDays,
-        weeklyGoalRepetitions: settings.scales.length * settings.repetitionsRequired,
-      };
-      setRawSettings(updatedSettings);
-      setPracticeState(initializePracticeState(updatedSettings));
-      setDailyRepetitions({});
-      setDailyGoalCelebrations({});
+      setRawSettings((prev) => ({ ...prev, cycleDays: newCycleDays }));
+      setPracticeState((prev) => ({
+        ...prev,
+        cycleStartDate: getLocalDateString(),
+        round: 1,
+        currentScaleIndex: 0,
+        practiceOrder: shuffleArray(
+          Array.from({ length: settings.scales.length }, (_, i) => i)
+        ),
+      }));
+      toast({
+        title: "New Cycle Started",
+        description: `Started a fresh ${newCycleDays}-day practice cycle.`,
+      });
     },
-    [settings, setPracticeState, setRawSettings, setDailyRepetitions, setDailyGoalCelebrations]
+    [settings.scales.length, setPracticeState, setRawSettings]
   );
 
   const handleSettingsChange = useCallback(
     (newSettings: PracticeSettings) => {
-      setRawSettings({
-        ...newSettings,
-        weeklyGoalRepetitions: newSettings.scales.length * newSettings.repetitionsRequired,
-      });
+      setRawSettings(newSettings);
     },
     [setRawSettings]
   );
@@ -584,12 +566,20 @@ export default function Index() {
                   <h1 className="text-3xl font-bold text-foreground">Scaled</h1>
                   <div className="w-64 mx-auto space-y-2 mt-2">
                     <Progress
-                      value={dailyTargetDisplay > 0 ? (todayPaceProgressDisplay / dailyTargetDisplay) * 100 : 100}
+                      value={dailyGoal > 0 ? Math.min(100, (todayCompleted / dailyGoal) * 100) : 100}
                       className="h-1.5 bg-secondary"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Day {currentDayOfCycle} of {cycleDays} — {todayPaceProgressDisplay} of {dailyTargetDisplay} daily scales completed
-                    </p>
+                    <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+                      <span>
+                        Day {currentDayOfCycle} of {cycleDays} · {todayCompleted} of {dailyGoal} daily scales completed
+                      </span>
+                      {streak > 0 && (
+                        <span className="inline-flex items-center gap-1 font-semibold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full text-[11px]">
+                          <Flame className="w-3 h-3 fill-amber-500 text-amber-500" />
+                          <span>{streak} {streak === 1 ? 'day' : 'days'}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -598,10 +588,11 @@ export default function Index() {
                   <ScaleCard
                     scaleName={currentScale.name}
                     successCount={currentScale.successCount}
-                    repetitionsRequired={settings.repetitionsRequired}
+                    weeklyCompletions={currentScaleWeeklyCompletions}
+                    currentRoundPosition={practiceState.currentScaleIndex + 1}
+                    totalInRound={practiceState.practiceOrder.length}
                     onAccept={handleAccept}
                     onDecline={handleDecline}
-                    isCompleted={false}
                     acceptDisabled={isAcceptPending}
                     fingerCombination={chosenFingerPattern}
                     fingerPatterns={settings.fingerPatterns}
@@ -635,13 +626,13 @@ export default function Index() {
               <aside className="lg:sticky lg:top-24 bg-muted/50 rounded-2xl p-6">
                 <ProgressTracker
                   scaleProgress={practiceState.scaleProgress}
-                  repetitionsRequired={settings.repetitionsRequired}
-                  weeklyGoalRepetitions={weeklyGoalRepetitions}
-                  weeklyCompletedRepetitions={weeklyCompletedRepetitions}
-                  dailyTargetRepetitions={dailyTargetRepetitions}
-                  dailyRemainingRepetitions={dailyRemainingRepetitions}
+                  dailyGoal={dailyGoal}
+                  todayCompleted={todayCompleted}
                   currentScale={currentScale?.name || ''}
-                  cycleDays={settings.cycleDays || 7}
+                  currentScaleIndex={practiceState.currentScaleIndex}
+                  practiceOrder={practiceState.practiceOrder}
+                  streak={streak}
+                  round={practiceState.round || 1}
                   onOpenSettings={() => {
                     setSettingsInitialTab('scales');
                     setSettingsOpen(true);
@@ -652,15 +643,6 @@ export default function Index() {
           </main>
         </div>
       </div>
-
-      <GoalAchievementModal
-        isOpen={allCompleted && !goalModalDismissed}
-        onClose={() => setGoalModalDismissed(true)}
-        onStartNewCycle={handleStartNewCycle}
-        completedScalesCount={practiceState.scaleProgress.length}
-        totalRepetitionsCompleted={weeklyCompletedRepetitions}
-        currentCycleDays={settings.cycleDays || 7}
-      />
 
       <AboutModal
         isOpen={aboutOpen}

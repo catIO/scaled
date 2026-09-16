@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { MdCheck, MdClose, MdMusicNote } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRandomFingerCombination } from '@/lib/fingerCombinations';
 import { SCALE_DICTIONARY, getBaseScaleName, getOctaveCount, generateMultiOctaveABC } from '@/lib/notation';
 
@@ -11,10 +12,12 @@ const ScaleNotationModal = lazy(() =>
 interface ScaleCardProps {
   scaleName: string;
   successCount: number;
-  repetitionsRequired: number;
+  weeklyCompletions?: number;
+  currentRoundPosition?: number;
+  totalInRound?: number;
   onAccept: () => void;
   onDecline: () => void;
-  isCompleted: boolean;
+  isCompleted?: boolean;
   acceptDisabled?: boolean;
   /** When provided, this pattern is shown; otherwise a random one is chosen from fingerPatterns */
   fingerCombination?: string | null;
@@ -24,10 +27,12 @@ interface ScaleCardProps {
 export function ScaleCard({
   scaleName,
   successCount,
-  repetitionsRequired,
+  weeklyCompletions = 0,
+  currentRoundPosition,
+  totalInRound,
   onAccept,
   onDecline,
-  isCompleted,
+  isCompleted = false,
   acceptDisabled = false,
   fingerCombination: fingerCombinationProp,
   fingerPatterns,
@@ -55,7 +60,7 @@ export function ScaleCard({
     fingerCombinationProp !== undefined ? fingerCombinationProp : localFingerCombination;
 
   return (
-    <div className="w-full max-w-lg animate-scale-in">
+    <div className="w-full max-w-md animate-scale-in">
       <div className="bg-muted rounded-2xl material-shadow-xl p-8 text-center space-y-6">
         <button
           onClick={() => notation && setShowNotation(true)}
@@ -85,26 +90,34 @@ export function ScaleCard({
           )}
         </div>
 
-        <div className="flex items-center justify-center gap-2 py-4 pt-2">
-          <div className="flex gap-1">
-            {Array.from({ length: repetitionsRequired }).map((_, i) => (
-              <div
-                key={i}
-                className={`w-4 h-4 rounded-full transition-all duration-300 ${i < successCount ? 'bg-success scale-110' : 'bg-foreground/20'
-                  }`}
-              />
-            ))}
-          </div>
-          <span className="text-sm text-muted-foreground ml-2">
-            {successCount} / {repetitionsRequired}
-          </span>
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center justify-center gap-2 py-4 pt-2 cursor-default">
+              <div className="flex gap-1">
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-4 h-4 rounded-full transition-all duration-300 ${
+                      i < weeklyCompletions ? 'bg-success scale-110' : 'bg-foreground/20'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-sm text-muted-foreground ml-2">
+                {weeklyCompletions} / 7
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Scales completed this week</p>
+          </TooltipContent>
+        </Tooltip>
 
         {!isCompleted && (
-          <div className="flex gap-3 justify-center pt-4">
+          <div className="flex gap-3 justify-center pt-2">
             <Button
               onClick={onDecline}
-              aria-label="Mark scale as incomplete"
+              aria-label="Skip scale"
               className="w-16 h-16 rounded-xl bg-destructive text-white hover:bg-destructive/90 [&_svg]:!w-8 [&_svg]:!h-9"
             >
               <MdClose />

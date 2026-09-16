@@ -2,6 +2,7 @@ export interface ScaleProgress {
   name: string;
   successCount: number;
   completed: boolean;
+  history?: Record<string, number>; // YYYY-MM-DD -> completion count
 }
 
 export interface MetronomeSettings {
@@ -14,18 +15,18 @@ export interface MetronomeSettings {
 
 export interface PracticeSettings {
   scales: string[];
-  repetitionsRequired: number;
-  weeklyGoalRepetitions: number;
-  cycleDays: number;
+  dailyGoal: number; // Number of scales to practice every day
+  cycleDays: number; // Duration of practice cycle in days (default: 7)
   metronome: MetronomeSettings;
-  fingerPatterns: string[]; // array of finger patterns to use for all scales
+  fingerPatterns: string[]; // Array of finger patterns to use for all scales
 }
 
 export interface PracticeState {
   currentScaleIndex: number;
   scaleProgress: ScaleProgress[];
   practiceOrder: number[];
-  cycleStartDate: string;
+  round: number;
+  cycleStartDate?: string;
 }
 
 export const DEFAULT_SCALES = [
@@ -34,8 +35,7 @@ export const DEFAULT_SCALES = [
 
 export const DEFAULT_SETTINGS: PracticeSettings = {
   scales: DEFAULT_SCALES,
-  repetitionsRequired: 3,
-  weeklyGoalRepetitions: DEFAULT_SCALES.length * 3,
+  dailyGoal: 10,
   cycleDays: 7,
   metronome: {
     enabled: true,

@@ -1,10 +1,12 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense, useMemo } from 'react';
 import { ScaleProgress } from '@/types/practice';
 import { MdMusicNote } from 'react-icons/md';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { Sparkles, X } from 'lucide-react';
+import { Sparkles, X, Flame } from 'lucide-react';
 import { SCALE_DICTIONARY, getBaseScaleName, getOctaveCount, generateMultiOctaveABC } from '@/lib/notation';
+import { getScaleWeeklyCompletions } from '@/lib/dateUtils';
 
 const ScaleNotationModal = lazy(() =>
   import('@/components/ScaleNotationModal').then((module) => ({ default: module.ScaleNotationModal }))
@@ -12,71 +14,97 @@ const ScaleNotationModal = lazy(() =>
 
 interface ProgressTrackerProps {
   scaleProgress: ScaleProgress[];
-  repetitionsRequired: number;
-  weeklyGoalRepetitions: number;
-  weeklyCompletedRepetitions: number;
-  dailyTargetRepetitions: number;
-  dailyRemainingRepetitions: number;
+  dailyGoal: number;
+  todayCompleted: number;
   currentScale: string;
-  cycleDays?: number;
+  currentScaleIndex: number;
+  practiceOrder: number[];
+  streak: number;
+  round?: number;
   onOpenSettings?: () => void;
 }
 
 export function ProgressTracker({
   scaleProgress,
-  repetitionsRequired,
-  weeklyGoalRepetitions,
-  weeklyCompletedRepetitions,
-  dailyTargetRepetitions,
-  dailyRemainingRepetitions,
+  dailyGoal,
+  todayCompleted,
   currentScale,
-  cycleDays = 7,
+  currentScaleIndex,
+  practiceOrder,
+  streak,
+  round = 1,
   onOpenSettings,
 }: ProgressTrackerProps) {
-  const [notationScale, setNotationScale] = useState<{ name: string, abc: string } | null>(null);
+  const [notationScale, setNotationScale] = useState<{ name: string; abc: string } | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useLocalStorage('scaled-starter-tip-dismissed', false);
 
   const showStarterTip = !onboardingDismissed && scaleProgress.length <= 1;
 
-  const weeklyProgressPct = weeklyGoalRepetitions
-    ? (weeklyCompletedRepetitions / weeklyGoalRepetitions) * 100
-    : 0;
-  const dailyTargetRounded = Math.ceil(dailyTargetRepetitions);
-  const dailyRemainingRounded = Math.max(0, Math.ceil(dailyRemainingRepetitions));
+  const dailyProgressPct = dailyGoal > 0 ? (todayCompleted / dailyGoal) * 100 : 0;
+  const totalScales = scaleProgress.length;
+  const currentScaleNumber = totalScales > 0 ? Math.min(totalScales, currentScaleIndex + 1) : 0;
+
+  const playedIndices = useMemo(() => {
+    return new Set(practiceOrder.slice(0, currentScaleIndex));
+  }, [practiceOrder, currentScaleIndex]);
 
   return (
-    <div className="w-full space-y-3">
-      <div className="flex items-center justify-between py-1">
-        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Progress</h3>
-        <span className="text-xs font-medium text-muted-foreground">
-          {weeklyCompletedRepetitions}/{weeklyGoalRepetitions}
-        </span>
-      </div>
+    <div className="w-full space-y-4">
+      {/* Daily Goal Header */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between py-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
+              Daily Goal
+            </h3>
+            {streak > 0 && (
+              <div
+                className="flex items-center gap-1 text-xs font-semibold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full"
+                title={`${streak} day daily goal streak`}
+              >
+                <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                <span>{streak} {streak === 1 ? 'day' : 'days'}</span>
+              </div>
+            )}
+          </div>
+          <span className="text-xs font-medium text-muted-foreground">
+            {todayCompleted}/{dailyGoal}
+          </span>
+        </div>
 
-      <div className="h-2 bg-muted rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ease-out ${weeklyCompletedRepetitions >= weeklyGoalRepetitions ? 'bg-success' : 'bg-primary'
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ease-out ${
+              todayCompleted >= dailyGoal ? 'bg-success' : 'bg-primary'
             }`}
-          style={{ width: `${Math.min(weeklyProgressPct, 100)}%` }}
-        />
+            style={{ width: `${Math.min(dailyProgressPct, 100)}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Round {round}</span>
+          <span>Scale {currentScaleNumber} of {totalScales}</span>
+        </div>
       </div>
 
-      <div className="text-xs text-muted-foreground">
-        Daily target: {dailyTargetRounded} reps | Remaining today: {dailyRemainingRounded}
-      </div>
-
-      <div className="grid gap-2 overflow-y-auto pr-2">
-        {scaleProgress.map((scale) => {
-          const isScaleCompleted = scale.successCount >= repetitionsRequired;
-          const progress = (scale.successCount / repetitionsRequired) * 100;
+      {/* Scale List */}
+      <div className="grid gap-2 overflow-y-auto max-h-[50vh] pr-1">
+        {scaleProgress.map((scale, idx) => {
           const isCurrent = scale.name === currentScale;
+          const isPlayedInRound = playedIndices.has(idx);
           const baseName = getBaseScaleName(scale.name);
           const octaves = getOctaveCount(scale.name);
           const baseDef = SCALE_DICTIONARY[baseName];
-          const notation = baseDef ? {
-            name: scale.name,
-            abc: generateMultiOctaveABC(baseDef, octaves)
-          } : null;
+          const notation = baseDef
+            ? {
+                name: scale.name,
+                abc: generateMultiOctaveABC(baseDef, octaves),
+              }
+            : null;
+
+          const weeklyCompletions = getScaleWeeklyCompletions(scale.history);
+          const isScaleCompleted = weeklyCompletions >= 7;
+          const progress = (weeklyCompletions / 7) * 100;
 
           return (
             <div
@@ -84,15 +112,19 @@ export function ProgressTracker({
               className={`
                 relative overflow-hidden rounded-lg p-3 transition-all duration-300
                 ${isCurrent ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'}
-                ${isScaleCompleted ? 'bg-success/10' : ''}
+                ${isPlayedInRound && !isCurrent ? 'opacity-85' : ''}
                 material-shadow-sm
               `}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className={`text-sm font-medium ${isCurrent ? 'text-primary' : 'text-card-foreground'}`}>
+                <span
+                  className={`text-sm font-medium truncate mr-2 ${
+                    isCurrent ? 'text-primary font-semibold' : 'text-card-foreground'
+                  }`}
+                >
                   {scale.name}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {notation && (
                     <Button
                       variant="ghost"
@@ -104,21 +136,27 @@ export function ProgressTracker({
                       <MdMusicNote className="w-4 h-4" />
                     </Button>
                   )}
-                  <span className="text-xs text-muted-foreground">
-                    {scale.successCount}/{repetitionsRequired}
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs text-muted-foreground cursor-default">
+                        {weeklyCompletions}/7
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Scales completed this week</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
 
               <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ease-out ${isScaleCompleted ? 'bg-success' : 'bg-primary'
-                    }`}
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
+                    isScaleCompleted ? 'bg-success' : 'bg-primary'
+                  }`}
                   style={{ width: `${Math.min(progress, 100)}%` }}
                 />
               </div>
-
-              {/* Checkmark removed */}
             </div>
           );
         })}

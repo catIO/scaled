@@ -59,8 +59,7 @@ const isValidBackup = (data: unknown): data is { settings: PracticeSettings; pra
   // Validate settings
   if (!Array.isArray(settings.scales)) return false;
   if (!settings.scales.every((s: unknown) => typeof s === 'string')) return false;
-  if (typeof settings.repetitionsRequired !== 'number' || settings.repetitionsRequired < 1) return false;
-  if (settings.weeklyGoalRepetitions !== undefined && (typeof settings.weeklyGoalRepetitions !== 'number' || settings.weeklyGoalRepetitions < 1)) return false;
+  if (settings.cycleDays !== undefined && (typeof settings.cycleDays !== 'number' || settings.cycleDays < 1)) return false;
 
   if (!settings.metronome || typeof settings.metronome !== 'object') return false;
   if (typeof settings.metronome.enabled !== 'boolean') return false;
@@ -75,14 +74,8 @@ const isValidBackup = (data: unknown): data is { settings: PracticeSettings; pra
   }
 
   // Validate practiceState
-  if (typeof practiceState.currentScaleIndex !== 'number' || practiceState.currentScaleIndex < 0) return false;
+  if (typeof practiceState.currentScaleIndex !== 'number') return false;
   if (!Array.isArray(practiceState.scaleProgress)) return false;
-  for (const progress of practiceState.scaleProgress) {
-    if (!progress || typeof progress !== 'object') return false;
-    if (typeof progress.name !== 'string') return false;
-    if (typeof progress.successCount !== 'number' || progress.successCount < 0) return false;
-    if (typeof progress.completed !== 'boolean') return false;
-  }
   if (!Array.isArray(practiceState.practiceOrder)) return false;
   if (!practiceState.practiceOrder.every((idx: unknown) => typeof idx === 'number')) return false;
 
@@ -124,10 +117,8 @@ export function Settings({
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [octaves, setOctaves] = useState('1');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const cycleDays = settings.cycleDays || 7;
-  const suggestedWeeklyGoal = settings.scales.length * settings.repetitionsRequired;
-  const dailyTarget = suggestedWeeklyGoal / cycleDays;
-  const dailyTargetRounded = Math.max(1, Math.ceil(dailyTarget));
   const elapsedDays = getElapsedDays(practiceState.cycleStartDate);
 
   useEffect(() => {
@@ -192,15 +183,18 @@ export function Settings({
             importedSettings.fingerPatterns = [];
           }
 
-          // Goal settings migration for older backups
-          if (!importedSettings.weeklyGoalRepetitions || importedSettings.weeklyGoalRepetitions < 1) {
-            importedSettings.weeklyGoalRepetitions = importedSettings.scales.length * importedSettings.repetitionsRequired;
+          // Daily goal & cycle migration for older backups
+          if (!importedSettings.dailyGoal || importedSettings.dailyGoal < 1) {
+            importedSettings.dailyGoal = 10;
           }
           if (!importedSettings.cycleDays || importedSettings.cycleDays < 1) {
             importedSettings.cycleDays = 7;
           }
           if (!importedState.cycleStartDate) {
             importedState.cycleStartDate = getLocalDateString();
+          }
+          if (importedState.round === undefined || importedState.round < 1) {
+            importedState.round = 1;
           }
 
           // Integrity check: match scales and progress elements
@@ -273,7 +267,6 @@ export function Settings({
         onSettingsChange({
           ...settings,
           scales: newScales,
-          weeklyGoalRepetitions: newScales.length * settings.repetitionsRequired,
         });
         setNewScale('');
         setOctaves('1');
@@ -286,7 +279,6 @@ export function Settings({
     onSettingsChange({
       ...settings,
       scales: newScales,
-      weeklyGoalRepetitions: newScales.length * settings.repetitionsRequired,
     });
   };
 
@@ -435,39 +427,16 @@ export function Settings({
 
           {/* Goals Tab */}
           <TabsContent value="goals" className="space-y-6 mt-4">
+            {/* Daily Goal */}
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Repetitions Per Scale</Label>
+              <Label className="text-sm font-medium">Daily Goal</Label>
               <div className="flex items-center gap-4">
                 <Slider
-                  value={[settings.repetitionsRequired]}
+                  value={[settings.dailyGoal]}
                   onValueChange={([value]) =>
                     onSettingsChange({
                       ...settings,
-                      repetitionsRequired: value,
-                      weeklyGoalRepetitions: settings.scales.length * value,
-                    })
-                  }
-                  min={1}
-                  max={10}
-                  step={1}
-                  className="flex-1"
-                />
-                <span className="w-12 text-center text-lg font-bold text-primary">
-                  {settings.repetitionsRequired}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">Goal Timeline</Label>
-              <div className="flex items-center gap-4">
-                <Slider
-                  value={[settings.cycleDays || 7]}
-                  onValueChange={([value]) =>
-                    onSettingsChange({
-                      ...settings,
-                      cycleDays: value,
-                      weeklyGoalRepetitions: settings.scales.length * settings.repetitionsRequired,
+                      dailyGoal: value,
                     })
                   }
                   min={1}
@@ -476,37 +445,58 @@ export function Settings({
                   className="flex-1"
                 />
                 <span className="w-16 text-right text-base font-bold text-primary">
-                  {settings.cycleDays || 7} Days
+                  {settings.dailyGoal} / Day
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Target: {suggestedWeeklyGoal} completed scales over {settings.cycleDays || 7} days.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Daily pace target: {dailyTargetRounded} completed scales/day.
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Choose how many scales you want to practice each day. Scaled randomly selects from your list without repeating until all scales have been played.
               </p>
             </div>
 
-            {onStartNewCycle && (
-              <div className="p-3 bg-muted/40 rounded-xl border border-border flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-foreground">Current Cycle</p>
-                  <p className="text-xs text-muted-foreground">
-                    Started: {practiceState.cycleStartDate || 'Today'} · Day {Math.min(elapsedDays, cycleDays)} of {cycleDays}
-                  </p>
-                </div>
+            {/* Practice Cycle */}
+            <div className="space-y-3 pt-2">
+              <div className="flex justify-between items-center">
+                <Label className="text-sm font-medium">Practice Cycle</Label>
+                <span className="text-sm font-bold text-primary">
+                  {cycleDays} {cycleDays === 1 ? 'Day' : 'Days'}
+                </span>
+              </div>
+              <Slider
+                value={[cycleDays]}
+                onValueChange={([value]) =>
+                  onSettingsChange({
+                    ...settings,
+                    cycleDays: value,
+                  })
+                }
+                min={1}
+                max={30}
+                step={1}
+              />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Define how many days your practice cycle lasts (e.g. 7 days for a weekly cycle).
+              </p>
+            </div>
+
+            {/* Current Cycle Status */}
+            <div className="p-3.5 bg-muted/40 rounded-xl border border-border flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-foreground">Current Cycle</p>
+                <p className="text-xs text-muted-foreground">
+                  Started: {practiceState.cycleStartDate || 'Today'} · Day {Math.min(elapsedDays, cycleDays)} of {cycleDays}
+                </p>
+              </div>
+              {onStartNewCycle && (
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
-                    onStartNewCycle(settings.cycleDays || 7);
-                    setOpen(false);
-                  }}
+                  onClick={() => onStartNewCycle(cycleDays)}
+                  className="text-xs h-8"
                 >
                   Start New Cycle
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Data Management Section */}
             <div className="pt-4 border-t space-y-4">

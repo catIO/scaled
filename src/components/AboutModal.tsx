@@ -6,7 +6,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Info, CheckCircle2, Music, Target, Sparkles } from 'lucide-react';
+import { ExternalLink, Info, CheckCircle2, Music, Target, Flame } from 'lucide-react';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -15,8 +15,8 @@ interface AboutModalProps {
 
 const STEPS = [
   {
-    title: 'Configure Your Practice',
-    description: 'Open Settings to customize your active scale list, repetitions per scale, cycle length, and week start day.',
+    title: 'Configure Your Scales & Goal',
+    description: 'Open Settings to customize your active scale syllabus and choose how many scales to practice each day.',
     icon: Target,
   },
   {
@@ -26,13 +26,13 @@ const STEPS = [
   },
   {
     title: 'Practice & Record',
-    description: 'Play the prompt scale and click Accept for each clean run to increment your repetition counter.',
+    description: 'Play the prompted scale and click Accept for each clean run to mark it played and advance.',
     icon: CheckCircle2,
   },
   {
-    title: 'Daily & Weekly Targets',
-    description: 'Track daily pace against your automatically calculated goal so you finish every scale in your cycle.',
-    icon: Sparkles,
+    title: 'Non-Repeating Selection & Streaks',
+    description: 'Scales are chosen randomly without repeating until all scales have been played once. Practice daily to build your streak.',
+    icon: Flame,
   },
 ];
 
@@ -49,7 +49,7 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
             About Scaled
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-            Scaled helps musicians build consistent practice habits with progressive repetition tracking, finger combination cycling, and pace-adjusted daily goals.
+            Scaled helps musicians build consistent habits with daily practice goals, non-repeating random scale selection, streak tracking, and right-hand finger combinations.
           </DialogDescription>
         </DialogHeader>
 

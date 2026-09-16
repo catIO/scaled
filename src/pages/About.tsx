@@ -8,7 +8,7 @@ export default function About() {
                     <header className="space-y-3">
                         <h1 className="text-3xl font-bold text-foreground">About Scaled</h1>
                         <p className="text-muted-foreground max-w-2xl">
-                            Scaled helps you practice scales consistently with simple repetition tracking and a daily target built from your weekly plan.
+                            Scaled helps you practice scales consistently with a customizable daily scale goal, non-repeating random scale selection, and daily practice streaks.
                         </p>
                     </header>
 
@@ -16,12 +16,12 @@ export default function About() {
                         <h2 className="text-xl font-semibold text-foreground">How To Use This App</h2>
                         <ol className="list-decimal pl-6 space-y-2 text-sm text-muted-foreground">
                             <li>Open Settings and review your scale list in the Scales tab.</li>
-                            <li>In Goals, set Repetitions Per Scale and choose your week start day.</li>
+                            <li>In Goals, set how many scales you want to practice each day.</li>
                             <li>In Finger Patterns, pick the right-hand patterns you want to cycle through while practicing.</li>
-                            <li>Your weekly goal is inferred automatically from scales x repetitions.</li>
-                            <li>Practice the current scale and mark each successful run with the check button.</li>
-                            <li>Track your daily progress at the top and in the progress panel.</li>
-                            <li>When you reach today's target, confetti confirms you are on pace.</li>
+                            <li>Practice the current scale and mark each clean run with the check button.</li>
+                            <li>Scales are randomly chosen without repeating until all scales have been played once.</li>
+                            <li>Track your daily progress and streak in the top header and sidebar.</li>
+                            <li>When you reach today's target, confetti confirms your daily goal is complete.</li>
                         </ol>
                     </section>
 
