@@ -3,10 +3,11 @@ import { MdSettings, MdAdd, MdDelete, MdFileUpload, MdFileDownload } from 'react
 import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { getLocalDateString, getElapsedDays } from '@/lib/dateUtils';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -40,7 +51,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Info, ExternalLink } from "lucide-react";
+import { Check, ChevronsUpDown, Info, ExternalLink, Flame } from "lucide-react";
 import { UNIQUE_SCALE_NAMES } from '@/lib/notation';
 import { PracticeSettings, PracticeState } from '@/types/practice';
 
@@ -82,6 +93,8 @@ const isValidBackup = (data: unknown): data is BackupData => {
     if (!settings.fingerPatterns.every((p: unknown) => typeof p === 'string')) return false;
   }
 
+  if (settings.useStreak !== undefined && typeof settings.useStreak !== 'boolean') return false;
+
   // Validate practiceState
   if (typeof practiceState.currentScaleIndex !== 'number') return false;
   if (!Array.isArray(practiceState.scaleProgress)) return false;
@@ -95,11 +108,13 @@ interface SettingsProps {
   settings: PracticeSettings;
   onSettingsChange: (settings: PracticeSettings) => void;
   onReset: () => void;
+  onResetStreak?: () => void;
   onStartNewCycle?: (cycleDays: number) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   practiceState: PracticeState;
   dailyRepetitions?: Record<string, number>;
+  streak?: number;
   onImport: (
     settings: PracticeSettings,
     state: PracticeState,
@@ -115,11 +130,13 @@ export function Settings({
   settings,
   onSettingsChange,
   onReset,
+  onResetStreak,
   onStartNewCycle,
   open: controlledOpen,
   onOpenChange,
   practiceState,
   dailyRepetitions,
+  streak = 0,
   onImport,
   initialTab,
   onGearClick,
@@ -132,6 +149,7 @@ export function Settings({
   const [activeTab, setActiveTab] = useState<'scales' | 'goals' | 'fingers'>(initialTab || 'scales');
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [octaves, setOctaves] = useState('1');
+  const [showResetStreakConfirm, setShowResetStreakConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const cycleDays = settings.cycleDays || 7;
@@ -150,6 +168,7 @@ export function Settings({
         settings,
         practiceState,
         dailyRepetitions: dailyRepetitions || {},
+        streak,
       };
       const jsonString = JSON.stringify(exportData, null, 2);
       const blob = new Blob([jsonString], { type: 'application/json' });
@@ -519,6 +538,54 @@ export function Settings({
               )}
             </div>
 
+            {/* Practice Streak Section */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5 pr-4">
+                  <Label htmlFor="use-streak-toggle" className="text-sm font-medium">Practice Streak</Label>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Track daily practice consistency. Streaks do not reset automatically on missed days.
+                  </p>
+                </div>
+                <Switch
+                  id="use-streak-toggle"
+                  checked={settings.useStreak !== false}
+                  onCheckedChange={(checked) =>
+                    onSettingsChange({
+                      ...settings,
+                      useStreak: checked,
+                    })
+                  }
+                />
+              </div>
+
+              {settings.useStreak !== false && (
+                <div className="p-3.5 bg-muted/40 rounded-xl border border-border flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
+                      <Flame className="w-4 h-4 fill-amber-500 text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">Current Streak</p>
+                      <p className="text-xs text-muted-foreground">
+                        {streak} {streak === 1 ? 'day' : 'days'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowResetStreakConfirm(true)}
+                    disabled={streak === 0}
+                    className="text-xs h-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    Reset Streak
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Data Management Section */}
             <div className="pt-4 border-t space-y-4">
               <div className="space-y-1">
@@ -638,6 +705,31 @@ export function Settings({
           accept=".json"
           className="hidden"
         />
+
+        <AlertDialog open={showResetStreakConfirm} onOpenChange={setShowResetStreakConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reset Practice Streak?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will reset your daily practice streak to 0. Your scale practice scores and completion history will remain intact. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (onResetStreak) {
+                    onResetStreak();
+                  }
+                  setShowResetStreakConfirm(false);
+                }}
+                className={buttonVariants({ variant: "destructive" })}
+              >
+                Reset Streak
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

@@ -31,7 +31,7 @@ const STEPS = [
   },
   {
     title: 'Non-Repeating Selection & Streaks',
-    description: 'Scales are chosen randomly without repeating until all scales have been played once. Practice daily to build your streak.',
+    description: 'Scales are chosen randomly without repeating until all scales have been played once. Practice daily to build your streak, which does not reset automatically.',
     icon: Flame,
   },
 ];

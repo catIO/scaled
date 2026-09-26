@@ -16,12 +16,14 @@ import {
   PracticeSettings,
   PracticeState,
   ScaleProgress,
+  PracticeStreakState,
   DEFAULT_SETTINGS,
 } from '@/types/practice';
 import { getNextFingerCombination } from '@/lib/fingerCombinations';
 import {
   getDayKey,
   calculateDailyStreak,
+  calculateCompletedDays,
   deriveDailyRepetitions,
   migrateLegacyBackup,
   getScaleWeeklyCompletions,
@@ -98,6 +100,36 @@ function initializePracticeState(settings: PracticeSettings): PracticeState {
 
 const ACCEPT_COOLDOWN_MS = 900;
 
+const getInitialStreakState = (): PracticeStreakState => {
+  try {
+    const saved = localStorage.getItem('scale-practice-streak');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (typeof parsed === 'number') {
+        return { streak: parsed };
+      }
+      if (parsed && typeof parsed.streak === 'number') {
+        return parsed;
+      }
+    }
+
+    const savedReps = localStorage.getItem('scale-practice-daily-repetitions');
+    const savedSettings = localStorage.getItem('scale-practice-settings');
+    const goal = savedSettings ? (JSON.parse(savedSettings).dailyGoal || 10) : 10;
+    if (savedReps) {
+      const reps = JSON.parse(savedReps) as Record<string, number>;
+      const completed = calculateCompletedDays(reps, goal);
+      return {
+        streak: completed.count,
+        lastCompletedDate: completed.lastCompletedDate,
+      };
+    }
+  } catch (e) {
+    console.error('Error initializing streak state:', e);
+  }
+  return { streak: 0 };
+};
+
 export default function Index() {
   const [rawSettings, setRawSettings] = useLocalStorage<PracticeSettings>(
     'scale-practice-settings',
@@ -138,6 +170,11 @@ export default function Index() {
 
     if (!migrated.dailyGoal || !Number.isFinite(migrated.dailyGoal) || migrated.dailyGoal < 1) {
       migrated.dailyGoal = 10;
+      needsUpdate = true;
+    }
+
+    if (migrated.useStreak === undefined) {
+      migrated.useStreak = true;
       needsUpdate = true;
     }
 
@@ -203,6 +240,10 @@ export default function Index() {
   const [dailyGoalCelebrations, setDailyGoalCelebrations] = useLocalStorage<Record<string, boolean>>(
     'scale-practice-daily-goal-celebrations',
     {}
+  );
+  const [streakState, setStreakState] = useLocalStorage<PracticeStreakState>(
+    'scale-practice-streak',
+    getInitialStreakState()
   );
 
   const { isPlaying, toggle } = useMetronome(settings.metronome);
@@ -291,7 +332,7 @@ export default function Index() {
   const cycleDays = settings.cycleDays || 7;
   const elapsedDays = getElapsedDays(practiceState.cycleStartDate, today);
   const currentDayOfCycle = Math.min(cycleDays, elapsedDays);
-  const streak = calculateDailyStreak(dailyRepetitions, dailyGoal, today);
+  const streak = typeof streakState === 'number' ? streakState : (streakState?.streak || 0);
   const currentScaleWeeklyCompletions = useMemo(() => {
     const fromHist = getScaleWeeklyCompletions(currentScale?.history);
     return Math.max(fromHist, currentScale?.successCount || 0);
@@ -318,13 +359,30 @@ export default function Index() {
         [celebrationKey]: true,
       }));
     }
+
+    if (reachedDailyGoal) {
+      setStreakState((prev) => {
+        const currentStreak = typeof prev === 'number' ? prev : (prev?.streak || 0);
+        const lastDate = typeof prev === 'object' ? prev?.lastCompletedDate : undefined;
+
+        if (lastDate === todayDayKey) {
+          return typeof prev === 'object' ? prev : { streak: currentStreak, lastCompletedDate: todayDayKey };
+        }
+
+        return {
+          streak: currentStreak + 1,
+          lastCompletedDate: todayDayKey,
+        };
+      });
+    }
   }, [
     dailyGoal,
     dailyGoalCelebrations,
     fireConfetti,
     setDailyGoalCelebrations,
-    todayDayKey,
+    setStreakState,
     todayCompleted,
+    todayDayKey,
   ]);
 
   // Reconcile dailyRepetitions and scale history with practiceState (recovers completions on reload or after legacy import)
@@ -337,10 +395,14 @@ export default function Index() {
       const migrated = migrateLegacyBackup(
         settings as PracticeSettings & Record<string, unknown>,
         practiceState as PracticeState & Record<string, unknown>,
-        today
+        today,
+        dailyRepetitions
       );
       setPracticeState(migrated.practiceState);
-      setDailyRepetitions(migrated.dailyRepetitions);
+      setDailyRepetitions((prev) => ({
+        ...migrated.dailyRepetitions,
+        ...prev,
+      }));
       return;
     }
 
@@ -355,6 +417,16 @@ export default function Index() {
       setDailyRepetitions(derived);
     }
   }, [practiceState, dailyRepetitions, settings, setPracticeState, setDailyRepetitions, today]);
+
+  // Recover completions if today was already celebrated (confetti fired) but repetitions count was wiped
+  useEffect(() => {
+    if (dailyGoalCelebrations[todayDayKey] && (dailyRepetitions[todayDayKey] || 0) < dailyGoal) {
+      setDailyRepetitions((prev) => ({
+        ...prev,
+        [todayDayKey]: Math.max(prev[todayDayKey] || 0, dailyGoal),
+      }));
+    }
+  }, [dailyGoal, dailyGoalCelebrations, dailyRepetitions, setDailyRepetitions, todayDayKey]);
 
   const moveToNextScale = useCallback(() => {
     setPracticeState((prev) => {
@@ -452,12 +524,24 @@ export default function Index() {
     moveToNextScale();
   }, [moveToNextScale]);
 
+  const handleResetStreak = useCallback(() => {
+    setStreakState({
+      streak: 0,
+      lastCompletedDate: todayCompleted >= dailyGoal ? todayDayKey : undefined,
+    });
+    toast({
+      title: "Streak Reset",
+      description: "Your practice streak has been reset to 0.",
+    });
+  }, [dailyGoal, setStreakState, todayCompleted, todayDayKey]);
+
   const handleReset = useCallback(() => {
     recentFingerPatternsRef.current = [];
     setPracticeState(initializePracticeState(settings));
     setDailyRepetitions({});
     setDailyGoalCelebrations({});
-  }, [settings, setDailyGoalCelebrations, setDailyRepetitions, setPracticeState]);
+    setStreakState({ streak: 0 });
+  }, [settings, setDailyGoalCelebrations, setDailyRepetitions, setPracticeState, setStreakState]);
 
   const handleStartNewCycle = useCallback(
     (newCycleDays: number) => {
@@ -498,7 +582,8 @@ export default function Index() {
       const migrated = migrateLegacyBackup(
         importedSettings as PracticeSettings & Record<string, unknown>,
         importedState as PracticeState & Record<string, unknown>,
-        today
+        today,
+        importedDailyRepetitions || dailyRepetitions
       );
 
       prevScalesRef.current = migrated.settings.scales;
@@ -510,21 +595,20 @@ export default function Index() {
         importedDailyRepetitions || migrated.dailyRepetitions
       );
 
-      // If a streak count was explicitly provided but dates weren't recent,
-      // populate the missing consecutive days ending yesterday.
-      if (typeof rawStreak === 'number' && rawStreak > 0) {
+      if (typeof rawStreak === 'number' && rawStreak >= 0) {
         const goal = migrated.settings.dailyGoal || 10;
-        const currentStreak = calculateDailyStreak(restoredDailyRepetitions, goal, today);
-        if (currentStreak < rawStreak) {
-          const check = new Date(today);
-          for (let i = 0; i < rawStreak; i++) {
-            check.setDate(check.getDate() - 1);
-            const key = getDayKey(check);
-            if ((restoredDailyRepetitions[key] || 0) < goal) {
-              restoredDailyRepetitions[key] = goal;
-            }
-          }
-        }
+        const todayCount = (restoredDailyRepetitions || {})[todayDayKey] || 0;
+        setStreakState({
+          streak: rawStreak,
+          lastCompletedDate: todayCount >= goal ? todayDayKey : undefined,
+        });
+      } else {
+        const goal = migrated.settings.dailyGoal || 10;
+        const completed = calculateCompletedDays(restoredDailyRepetitions, goal);
+        setStreakState({
+          streak: completed.count,
+          lastCompletedDate: completed.lastCompletedDate,
+        });
       }
 
       setDailyRepetitions(restoredDailyRepetitions);
@@ -539,7 +623,7 @@ export default function Index() {
       }
       setDailyGoalCelebrations(celebrations);
     },
-    [setDailyGoalCelebrations, setDailyRepetitions, setRawSettings, setPracticeState, today]
+    [setDailyGoalCelebrations, setDailyRepetitions, setRawSettings, setPracticeState, setStreakState, today, todayDayKey]
   );
 
   // Cleanup pending navigation on unmount
@@ -619,11 +703,13 @@ export default function Index() {
                 settings={settings}
                 onSettingsChange={handleSettingsChange}
                 onReset={handleReset}
+                onResetStreak={handleResetStreak}
                 onStartNewCycle={handleStartNewCycle}
                 open={settingsOpen}
                 onOpenChange={setSettingsOpen}
                 practiceState={practiceState}
                 dailyRepetitions={dailyRepetitions}
+                streak={streak}
                 onImport={handleImport}
                 initialTab={settingsInitialTab}
                 onGearClick={() => setSettingsInitialTab('goals')}
@@ -703,6 +789,7 @@ export default function Index() {
                   practiceOrder={practiceState.practiceOrder}
                   round={practiceState.round || 1}
                   streak={streak}
+                  useStreak={settings.useStreak !== false}
                   onOpenSettings={() => {
                     setSettingsInitialTab('scales');
                     setSettingsOpen(true);

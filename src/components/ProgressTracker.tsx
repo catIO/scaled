@@ -22,6 +22,7 @@ interface ProgressTrackerProps {
   round?: number;
   onOpenSettings?: () => void;
   streak?: number;
+  useStreak?: boolean;
 }
 
 export function ProgressTracker({
@@ -34,6 +35,7 @@ export function ProgressTracker({
   round = 1,
   onOpenSettings,
   streak = 0,
+  useStreak = true,
 }: ProgressTrackerProps) {
   const [notationScale, setNotationScale] = useState<{ name: string; abc: string } | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useLocalStorage('scaled-starter-tip-dismissed', false);
@@ -57,7 +59,7 @@ export function ProgressTracker({
             <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
               Daily Goal
             </h3>
-            {streak > 0 && (
+            {useStreak && streak > 0 && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div

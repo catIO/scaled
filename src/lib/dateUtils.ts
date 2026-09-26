@@ -38,34 +38,54 @@ export function getDayKey(date: Date = new Date()): string {
   return getLocalDateString(getStartOfDay(date));
 }
 
-export function calculateDailyStreak(
+/**
+ * Calculates completed days where the daily goal was met.
+ * Streaks do not reset automatically on missed days.
+ */
+export function calculateCompletedDays(
   dailyRepetitions: Record<string, number>,
   dailyGoal: number,
-  today: Date = new Date()
-): number {
-  if (dailyGoal <= 0) return 0;
+  celebrations?: Record<string, boolean>
+): { count: number; lastCompletedDate?: string } {
+  if (dailyGoal <= 0) return { count: 0 };
+  const completedDateKeys = new Set<string>();
 
-  const todayStart = getStartOfDay(today);
-  const todayKey = getDayKey(todayStart);
-  const todayCount = dailyRepetitions[todayKey] || 0;
-  const todayMet = todayCount >= dailyGoal;
-
-  let streak = todayMet ? 1 : 0;
-  const checkDate = new Date(todayStart);
-
-  // Check backwards from yesterday
-  while (true) {
-    checkDate.setDate(checkDate.getDate() - 1);
-    const key = getDayKey(checkDate);
-    const count = dailyRepetitions[key] || 0;
-    if (count >= dailyGoal) {
-      streak++;
-    } else {
-      break;
+  if (dailyRepetitions && typeof dailyRepetitions === 'object') {
+    for (const [dayKey, count] of Object.entries(dailyRepetitions)) {
+      if (Number(count) >= dailyGoal) {
+        completedDateKeys.add(dayKey);
+      }
     }
   }
 
-  return streak;
+  if (celebrations && typeof celebrations === 'object') {
+    for (const [dayKey, celebrated] of Object.entries(celebrations)) {
+      if (celebrated) {
+        completedDateKeys.add(dayKey);
+      }
+    }
+  }
+
+  const sortedDates = Array.from(completedDateKeys).sort();
+  const lastCompletedDate = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : undefined;
+
+  return {
+    count: sortedDates.length,
+    lastCompletedDate,
+  };
+}
+
+/**
+ * Calculates the practice streak without automatic reset.
+ * Each day the daily goal is met adds to the streak.
+ */
+export function calculateDailyStreak(
+  dailyRepetitions: Record<string, number>,
+  dailyGoal: number,
+  _today: Date = new Date()
+): number {
+  if (dailyGoal <= 0) return 0;
+  return calculateCompletedDays(dailyRepetitions, dailyGoal).count;
 }
 
 /**
@@ -182,7 +202,8 @@ export function getElapsedDays(cycleStartDate?: string, today: Date = new Date()
 export function migrateLegacyBackup(
   importedSettings: PracticeSettings & Record<string, unknown>,
   importedState: PracticeState & Record<string, unknown>,
-  today: Date = new Date()
+  today: Date = new Date(),
+  existingDailyReps?: Record<string, number>
 ): {
   settings: PracticeSettings;
   practiceState: PracticeState;
@@ -254,7 +275,7 @@ export function migrateLegacyBackup(
     };
   });
 
-  const dailyRepetitions = deriveDailyRepetitions(migratedProgress);
+  const dailyRepetitions = deriveDailyRepetitions(migratedProgress, existingDailyReps);
 
   if (!hasHistory && totalSuccess > 0) {
     for (const key of completedDateKeys) {

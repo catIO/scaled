@@ -19,6 +19,12 @@ export interface PracticeSettings {
   cycleDays: number; // Duration of practice cycle in days (default: 7)
   metronome: MetronomeSettings;
   fingerPatterns: string[]; // Array of finger patterns to use for all scales
+  useStreak?: boolean; // Whether to track and display practice streak (default: true)
+}
+
+export interface PracticeStreakState {
+  streak: number;
+  lastCompletedDate?: string;
 }
 
 export interface PracticeState {
@@ -45,4 +51,5 @@ export const DEFAULT_SETTINGS: PracticeSettings = {
     subdivision: 1,
   },
   fingerPatterns: [],
+  useStreak: true,
 };
