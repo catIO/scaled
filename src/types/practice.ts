@@ -2,6 +2,7 @@ export interface ScaleProgress {
   name: string;
   successCount: number;
   completed: boolean;
+  cycleCompletions?: number; // completions within the active practice cycle
   history?: Record<string, number>; // YYYY-MM-DD -> completion count
 }
 

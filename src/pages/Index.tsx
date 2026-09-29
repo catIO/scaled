@@ -26,7 +26,8 @@ import {
   calculateCompletedDays,
   deriveDailyRepetitions,
   migrateLegacyBackup,
-  getScaleWeeklyCompletions,
+  getScaleCycleCompletions,
+  getCurrentCycleStartDate,
   getElapsedDays,
   getLocalDateString,
 } from '@/lib/dateUtils';
@@ -325,18 +326,43 @@ export default function Index() {
     }
   }, [currentScale?.name, settings.fingerPatterns]);
 
-  const today = new Date();
-  const todayDayKey = getDayKey(today);
+  const today = useMemo(() => new Date(), []);
+  const todayDayKey = useMemo(() => getDayKey(today), [today]);
   const todayCompleted = dailyRepetitions[todayDayKey] || 0;
   const dailyGoal = settings.dailyGoal || 10;
   const cycleDays = settings.cycleDays || 7;
-  const elapsedDays = getElapsedDays(practiceState.cycleStartDate, today);
+  const activeCycleStartDate = useMemo(() => {
+    return getCurrentCycleStartDate(practiceState.cycleStartDate, cycleDays, today);
+  }, [practiceState.cycleStartDate, cycleDays, today]);
+
+  const elapsedDays = getElapsedDays(activeCycleStartDate, today);
   const currentDayOfCycle = Math.min(cycleDays, elapsedDays);
   const streak = typeof streakState === 'number' ? streakState : (streakState?.streak || 0);
-  const currentScaleWeeklyCompletions = useMemo(() => {
-    const fromHist = getScaleWeeklyCompletions(currentScale?.history);
-    return Math.max(fromHist, currentScale?.successCount || 0);
-  }, [currentScale?.history, currentScale?.successCount]);
+  const currentScaleCycleCompletions = useMemo(() => {
+    return getScaleCycleCompletions(
+      currentScale?.history,
+      activeCycleStartDate,
+      cycleDays,
+      today
+    );
+  }, [currentScale?.history, activeCycleStartDate, cycleDays, today]);
+
+  // Synchronize cycle start date and reset scale completion markers when an active cycle expires
+  useEffect(() => {
+    if (practiceState.cycleStartDate && practiceState.cycleStartDate !== activeCycleStartDate) {
+      setPracticeState((prev) => ({
+        ...prev,
+        cycleStartDate: activeCycleStartDate,
+        round: 1,
+        currentScaleIndex: 0,
+        scaleProgress: prev.scaleProgress.map((s) => ({
+          ...s,
+          completed: false,
+          cycleCompletions: 0,
+        })),
+      }));
+    }
+  }, [activeCycleStartDate, practiceState.cycleStartDate, setPracticeState]);
 
   const fireConfetti = useCallback(() => {
     confetti({
@@ -439,15 +465,16 @@ export default function Index() {
       }
 
       const newPracticeOrder = generateNextRoundOrder(total, prev.practiceOrder);
+      const nextRound = (prev.round || 1) + 1;
       toast({
-        title: "Cycle Completed",
-        description: "All scales have been played! Reshuffling for a new cycle.",
+        title: "Round Completed",
+        description: `All scales have been played! Reshuffling for Round ${nextRound}.`,
       });
       return {
         ...prev,
         practiceOrder: newPracticeOrder,
         currentScaleIndex: 0,
-        round: (prev.round || 1) + 1,
+        round: nextRound,
       };
     });
   }, [setPracticeState]);
@@ -474,12 +501,14 @@ export default function Index() {
       didAccept = true;
 
       const newCount = scale.successCount + 1;
+      const newCycleCompletions = (scale.cycleCompletions || 0) + 1;
       const currentHistory = { ...(scale.history || {}) };
       currentHistory[todayDayKey] = (currentHistory[todayDayKey] || 0) + 1;
 
       newProgress[orderIndex] = {
         ...scale,
         successCount: newCount,
+        cycleCompletions: newCycleCompletions,
         completed: true,
         history: currentHistory,
       };
@@ -555,6 +584,11 @@ export default function Index() {
         practiceOrder: shuffleArray(
           Array.from({ length: settings.scales.length }, (_, i) => i)
         ),
+        scaleProgress: prev.scaleProgress.map((s) => ({
+          ...s,
+          completed: false,
+          cycleCompletions: 0,
+        })),
       }));
       toast({
         title: "New Cycle Started",
@@ -707,7 +741,7 @@ export default function Index() {
                 onStartNewCycle={handleStartNewCycle}
                 open={settingsOpen}
                 onOpenChange={setSettingsOpen}
-                practiceState={practiceState}
+                practiceState={{ ...practiceState, cycleStartDate: activeCycleStartDate }}
                 dailyRepetitions={dailyRepetitions}
                 streak={streak}
                 onImport={handleImport}
@@ -744,7 +778,8 @@ export default function Index() {
                   <ScaleCard
                     scaleName={currentScale.name}
                     successCount={currentScale.successCount}
-                    weeklyCompletions={currentScaleWeeklyCompletions}
+                    cycleCompletions={currentScaleCycleCompletions}
+                    cycleDays={cycleDays}
                     currentRoundPosition={practiceState.currentScaleIndex + 1}
                     totalInRound={practiceState.practiceOrder.length}
                     onAccept={handleAccept}
@@ -790,6 +825,9 @@ export default function Index() {
                   round={practiceState.round || 1}
                   streak={streak}
                   useStreak={settings.useStreak !== false}
+                  cycleStartDate={activeCycleStartDate}
+                  cycleDays={cycleDays}
+                  today={today}
                   onOpenSettings={() => {
                     setSettingsInitialTab('scales');
                     setSettingsOpen(true);

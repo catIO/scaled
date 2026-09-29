@@ -519,7 +519,7 @@ export function Settings({
             </div>
 
             {/* Current Cycle Status */}
-            <div className="p-3.5 bg-muted/40 rounded-xl border border-border flex items-center justify-between">
+            <div className="p-3.5 bg-muted/40 rounded-xl border border-border flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold text-foreground">Current Cycle</p>
                 <p className="text-xs text-muted-foreground">

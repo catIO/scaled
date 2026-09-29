@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Sparkles, X, Flame } from 'lucide-react';
 import { SCALE_DICTIONARY, getBaseScaleName, getOctaveCount, generateMultiOctaveABC } from '@/lib/notation';
-import { getScaleWeeklyCompletions } from '@/lib/dateUtils';
+import { getScaleCycleCompletions } from '@/lib/dateUtils';
 
 const ScaleNotationModal = lazy(() =>
   import('@/components/ScaleNotationModal').then((module) => ({ default: module.ScaleNotationModal }))
@@ -23,6 +23,9 @@ interface ProgressTrackerProps {
   onOpenSettings?: () => void;
   streak?: number;
   useStreak?: boolean;
+  cycleStartDate?: string;
+  cycleDays?: number;
+  today?: Date;
 }
 
 export function ProgressTracker({
@@ -36,6 +39,9 @@ export function ProgressTracker({
   onOpenSettings,
   streak = 0,
   useStreak = true,
+  cycleStartDate,
+  cycleDays = 7,
+  today,
 }: ProgressTrackerProps) {
   const [notationScale, setNotationScale] = useState<{ name: string; abc: string } | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useLocalStorage('scaled-starter-tip-dismissed', false);
@@ -111,11 +117,14 @@ export function ProgressTracker({
               }
             : null;
 
-          const weeklyCompletions = scale.history
-            ? Math.max(getScaleWeeklyCompletions(scale.history), scale.successCount || 0)
-            : (scale.successCount || 0);
-          const isScaleCompleted = scale.completed || weeklyCompletions >= 7;
-          const progress = (weeklyCompletions / 7) * 100;
+          const cyclePlays = getScaleCycleCompletions(
+            scale.history,
+            cycleStartDate,
+            cycleDays,
+            today
+          );
+          const isScaleCompleted = cyclePlays >= cycleDays;
+          const progress = Math.min(100, (cyclePlays / cycleDays) * 100);
 
           return (
             <div
@@ -149,12 +158,12 @@ export function ProgressTracker({
                   )}
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="text-xs text-muted-foreground cursor-default">
-                        {weeklyCompletions}/7
+                      <span className="text-xs text-muted-foreground cursor-default font-medium">
+                        {cyclePlays}/{cycleDays}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Scales completed this week</p>
+                      <p>Practiced {cyclePlays} of {cycleDays} in current cycle ({scale.successCount || 0} all-time)</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>

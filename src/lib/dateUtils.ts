@@ -184,6 +184,61 @@ export function getScaleWeeklyCompletions(
 }
 
 /**
+ * Calculates how many times a scale was completed during the active practice cycle.
+ */
+export function getScaleCycleCompletions(
+  history: Record<string, number> | undefined,
+  cycleStartDate?: string,
+  cycleDays: number = 7,
+  today: Date = new Date()
+): number {
+  if (!history || !cycleStartDate) return 0;
+
+  const cycleStart = getStartOfDay(parseLocalDate(cycleStartDate));
+  const todayStart = getStartOfDay(today);
+  if (todayStart.getTime() < cycleStart.getTime()) return 0;
+
+  const safeCycleDays = Math.max(1, cycleDays || 7);
+  const cycleEnd = new Date(cycleStart);
+  cycleEnd.setDate(cycleEnd.getDate() + safeCycleDays - 1);
+
+  const effectiveEnd = todayStart.getTime() < cycleEnd.getTime() ? todayStart : cycleEnd;
+
+  let total = 0;
+  const current = new Date(cycleStart);
+  while (current.getTime() <= effectiveEnd.getTime()) {
+    const key = getDayKey(current);
+    total += history[key] || 0;
+    current.setDate(current.getDate() + 1);
+  }
+  return total;
+}
+
+/**
+ * Returns the effective start date of the current cycle, automatically advancing
+ * to a fresh cycle if elapsed days exceed cycle duration.
+ */
+export function getCurrentCycleStartDate(
+  cycleStartDate?: string,
+  cycleDays: number = 7,
+  today: Date = new Date()
+): string {
+  if (!cycleStartDate) return getLocalDateString(today);
+
+  const safeCycleDays = Math.max(1, cycleDays || 7);
+  const elapsedDays = getElapsedDays(cycleStartDate, today);
+  if (elapsedDays <= safeCycleDays) {
+    return cycleStartDate;
+  }
+
+  // Advance by full cycle intervals
+  const cyclesElapsed = Math.floor((elapsedDays - 1) / safeCycleDays);
+  const cycleStart = parseLocalDate(cycleStartDate);
+  cycleStart.setDate(cycleStart.getDate() + cyclesElapsed * safeCycleDays);
+  return getLocalDateString(cycleStart);
+}
+
+/**
  * Calculates elapsed days since cycle start date (inclusive, 1-indexed).
  */
 export function getElapsedDays(cycleStartDate?: string, today: Date = new Date()): number {

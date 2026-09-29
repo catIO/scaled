@@ -12,7 +12,8 @@ const ScaleNotationModal = lazy(() =>
 interface ScaleCardProps {
   scaleName: string;
   successCount: number;
-  weeklyCompletions?: number;
+  cycleCompletions?: number;
+  cycleDays?: number;
   currentRoundPosition?: number;
   totalInRound?: number;
   onAccept: () => void;
@@ -27,7 +28,8 @@ interface ScaleCardProps {
 export function ScaleCard({
   scaleName,
   successCount,
-  weeklyCompletions = 0,
+  cycleCompletions = 0,
+  cycleDays = 7,
   currentRoundPosition,
   totalInRound,
   onAccept,
@@ -94,22 +96,22 @@ export function ScaleCard({
           <TooltipTrigger asChild>
             <div className="flex items-center justify-center gap-2 py-4 pt-2 cursor-default">
               <div className="flex gap-1">
-                {Array.from({ length: 7 }).map((_, i) => (
+                {Array.from({ length: cycleDays }).map((_, i) => (
                   <div
                     key={i}
                     className={`w-4 h-4 rounded-full transition-all duration-300 ${
-                      i < weeklyCompletions ? 'bg-success scale-110' : 'bg-foreground/20'
+                      i < cycleCompletions ? 'bg-success scale-110' : 'bg-foreground/20'
                     }`}
                   />
                 ))}
               </div>
               <span className="text-sm text-muted-foreground ml-2">
-                {weeklyCompletions} / 7
+                {cycleCompletions} / {cycleDays}
               </span>
             </div>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Scales completed this week</p>
+            <p>Practiced {cycleCompletions} of {cycleDays} in current cycle ({successCount} all-time plays)</p>
           </TooltipContent>
         </Tooltip>
 
