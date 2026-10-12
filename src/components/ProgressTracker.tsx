@@ -26,6 +26,7 @@ interface ProgressTrackerProps {
   cycleStartDate?: string;
   cycleDays?: number;
   today?: Date;
+  reviewPool?: string[];
 }
 
 export function ProgressTracker({
@@ -42,6 +43,7 @@ export function ProgressTracker({
   cycleStartDate,
   cycleDays = 7,
   today,
+  reviewPool = [],
 }: ProgressTrackerProps) {
   const [notationScale, setNotationScale] = useState<{ name: string; abc: string } | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useLocalStorage('scaled-starter-tip-dismissed', false);
@@ -137,13 +139,20 @@ export function ProgressTracker({
               `}
             >
               <div className="flex items-center justify-between mb-2">
-                <span
-                  className={`text-sm font-medium truncate mr-2 ${
-                    isCurrent ? 'text-primary font-semibold' : 'text-card-foreground'
-                  }`}
-                >
-                  {scale.name}
-                </span>
+                <div className="flex items-center gap-1.5 truncate mr-2">
+                  <span
+                    className={`text-sm font-medium truncate ${
+                      isCurrent ? 'text-primary font-semibold' : 'text-card-foreground'
+                    }`}
+                  >
+                    {scale.name}
+                  </span>
+                  {reviewPool.includes(scale.name) && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
+                      Review
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {notation && (
                     <Button

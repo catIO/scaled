@@ -18,6 +18,7 @@ export interface PracticeSettings {
   scales: string[];
   dailyGoal: number; // Number of scales to practice every day
   cycleDays: number; // Duration of practice cycle in days (default: 7)
+  autoDailyGoal?: boolean; // Automatically divide scales across cycle days with buffer day
   metronome: MetronomeSettings;
   fingerPatterns: string[]; // Array of finger patterns to use for all scales
   useStreak?: boolean; // Whether to track and display practice streak (default: true)
@@ -34,6 +35,11 @@ export interface PracticeState {
   practiceOrder: number[];
   round: number;
   cycleStartDate?: string;
+  reviewPool?: string[]; // Scales queued for review on the cycle buffer day
+  todayRetries?: string[]; // Scale names already retried once today
+  todayRetriesDate?: string; // Date key corresponding to todayRetries
+  currentReviewIndex?: number; // Pointer within reviewPool during buffer day review
+  bonusRound?: boolean; // Free play mode on buffer day when review pool is cleared
 }
 
 export const DEFAULT_SCALES = [
@@ -44,6 +50,7 @@ export const DEFAULT_SETTINGS: PracticeSettings = {
   scales: DEFAULT_SCALES,
   dailyGoal: 10,
   cycleDays: 7,
+  autoDailyGoal: true,
   metronome: {
     enabled: true,
     bpm: 80,

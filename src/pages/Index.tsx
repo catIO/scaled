@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Button } from '@/components/ui/button';
-import { Info, ExternalLink, Music } from 'lucide-react';
+import { Info, ExternalLink, Music, CheckCircle2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { Progress } from '@/components/ui/progress';
@@ -30,6 +30,8 @@ import {
   getCurrentCycleStartDate,
   getElapsedDays,
   getLocalDateString,
+  calculatePacedDailyGoal,
+  isCycleBufferDay,
 } from '@/lib/dateUtils';
 
 // Shuffle array using Fisher-Yates
@@ -96,6 +98,11 @@ function initializePracticeState(settings: PracticeSettings): PracticeState {
     practiceOrder,
     round: 1,
     cycleStartDate: getLocalDateString(),
+    reviewPool: [],
+    todayRetries: [],
+    todayRetriesDate: getLocalDateString(),
+    currentReviewIndex: 0,
+    bonusRound: false,
   };
 }
 
@@ -169,7 +176,18 @@ export default function Index() {
       needsUpdate = true;
     }
 
-    if (!migrated.dailyGoal || !Number.isFinite(migrated.dailyGoal) || migrated.dailyGoal < 1) {
+    if (migrated.autoDailyGoal === undefined) {
+      migrated.autoDailyGoal = true;
+      needsUpdate = true;
+    }
+
+    if (migrated.autoDailyGoal) {
+      const paced = calculatePacedDailyGoal(migrated.scales?.length || 1, migrated.cycleDays);
+      if (migrated.dailyGoal !== paced) {
+        migrated.dailyGoal = paced;
+        needsUpdate = true;
+      }
+    } else if (!migrated.dailyGoal || !Number.isFinite(migrated.dailyGoal) || migrated.dailyGoal < 1) {
       migrated.dailyGoal = 10;
       needsUpdate = true;
     }
@@ -303,8 +321,32 @@ export default function Index() {
     });
   }, [settings.scales, setPracticeState]);
 
+  const today = useMemo(() => new Date(), []);
+  const todayDayKey = useMemo(() => getDayKey(today), [today]);
+  const todayCompleted = dailyRepetitions[todayDayKey] || 0;
+  const dailyGoal = settings.dailyGoal || 10;
+  const cycleDays = settings.cycleDays || 7;
+  const activeCycleStartDate = useMemo(() => {
+    return getCurrentCycleStartDate(practiceState.cycleStartDate, cycleDays, today);
+  }, [practiceState.cycleStartDate, cycleDays, today]);
+
+  const elapsedDays = getElapsedDays(activeCycleStartDate, today);
+  const currentDayOfCycle = Math.min(cycleDays, elapsedDays);
+  const isBufferDay = isCycleBufferDay(cycleDays, currentDayOfCycle);
+  const reviewPool = practiceState.reviewPool || [];
+  const isReviewMode = isBufferDay && reviewPool.length > 0 && !practiceState.bonusRound;
+
   const currentOrderIndex = practiceState.practiceOrder[practiceState.currentScaleIndex] ?? practiceState.practiceOrder[0];
-  const currentScale = practiceState.scaleProgress[currentOrderIndex];
+  const currentReviewIndex = Math.min(practiceState.currentReviewIndex || 0, Math.max(0, reviewPool.length - 1));
+  const activeReviewScaleName = isReviewMode ? reviewPool[currentReviewIndex] : null;
+
+  const currentScale = isReviewMode
+    ? practiceState.scaleProgress.find((s) => s.name === activeReviewScaleName)
+    : practiceState.scaleProgress[currentOrderIndex];
+
+  const isTodaySameDate = practiceState.todayRetriesDate === todayDayKey;
+  const todayRetriesList = isTodaySameDate ? (practiceState.todayRetries || []) : [];
+  const isCurrentScaleRetry = !isReviewMode && !!currentScale && todayRetriesList.includes(currentScale.name);
 
   // Pick next finger combination when scale or patterns change; avoid recently used
   useEffect(() => {
@@ -326,17 +368,6 @@ export default function Index() {
     }
   }, [currentScale?.name, settings.fingerPatterns]);
 
-  const today = useMemo(() => new Date(), []);
-  const todayDayKey = useMemo(() => getDayKey(today), [today]);
-  const todayCompleted = dailyRepetitions[todayDayKey] || 0;
-  const dailyGoal = settings.dailyGoal || 10;
-  const cycleDays = settings.cycleDays || 7;
-  const activeCycleStartDate = useMemo(() => {
-    return getCurrentCycleStartDate(practiceState.cycleStartDate, cycleDays, today);
-  }, [practiceState.cycleStartDate, cycleDays, today]);
-
-  const elapsedDays = getElapsedDays(activeCycleStartDate, today);
-  const currentDayOfCycle = Math.min(cycleDays, elapsedDays);
   const streak = typeof streakState === 'number' ? streakState : (streakState?.streak || 0);
   const currentScaleCycleCompletions = useMemo(() => {
     return getScaleCycleCompletions(
@@ -355,6 +386,11 @@ export default function Index() {
         cycleStartDate: activeCycleStartDate,
         round: 1,
         currentScaleIndex: 0,
+        reviewPool: [],
+        todayRetries: [],
+        todayRetriesDate: todayDayKey,
+        currentReviewIndex: 0,
+        bonusRound: false,
         scaleProgress: prev.scaleProgress.map((s) => ({
           ...s,
           completed: false,
@@ -362,7 +398,7 @@ export default function Index() {
         })),
       }));
     }
-  }, [activeCycleStartDate, practiceState.cycleStartDate, setPracticeState]);
+  }, [activeCycleStartDate, practiceState.cycleStartDate, setPracticeState, todayDayKey]);
 
   const fireConfetti = useCallback(() => {
     confetti({
@@ -491,30 +527,93 @@ export default function Index() {
 
     let didAccept = false;
 
-    setPracticeState((prev) => {
-      const orderIndex = prev.practiceOrder[prev.currentScaleIndex];
-      const newProgress = [...prev.scaleProgress];
-      const scale = newProgress[orderIndex];
-
-      if (!scale) return prev;
+    if (isReviewMode) {
+      const scaleToReview = activeReviewScaleName;
+      if (!scaleToReview) {
+        acceptInProgressRef.current = false;
+        setIsAcceptPending(false);
+        return;
+      }
 
       didAccept = true;
 
-      const newCount = scale.successCount + 1;
-      const newCycleCompletions = (scale.cycleCompletions || 0) + 1;
-      const currentHistory = { ...(scale.history || {}) };
-      currentHistory[todayDayKey] = (currentHistory[todayDayKey] || 0) + 1;
+      setPracticeState((prev) => {
+        const targetIdx = prev.scaleProgress.findIndex((s) => s.name === scaleToReview);
+        if (targetIdx === -1) return prev;
 
-      newProgress[orderIndex] = {
-        ...scale,
-        successCount: newCount,
-        cycleCompletions: newCycleCompletions,
-        completed: true,
-        history: currentHistory,
-      };
+        const newProgress = [...prev.scaleProgress];
+        const scale = newProgress[targetIdx];
+        const newCount = scale.successCount + 1;
+        const newCycleCompletions = (scale.cycleCompletions || 0) + 1;
+        const currentHistory = { ...(scale.history || {}) };
+        currentHistory[todayDayKey] = (currentHistory[todayDayKey] || 0) + 1;
 
-      return { ...prev, scaleProgress: newProgress };
-    });
+        newProgress[targetIdx] = {
+          ...scale,
+          successCount: newCount,
+          cycleCompletions: newCycleCompletions,
+          completed: true,
+          history: currentHistory,
+        };
+
+        const nextPool = (prev.reviewPool || []).filter((name) => name !== scaleToReview);
+
+        if (nextPool.length === 0) {
+          fireConfetti();
+          toast({
+            title: "Buffer Day Review Complete",
+            description: "All scales for this cycle have been mastered!",
+          });
+        } else {
+          toast({
+            title: "Scale Mastered",
+            description: `${scaleToReview} passed! ${nextPool.length} review scale(s) remaining.`,
+          });
+        }
+
+        return {
+          ...prev,
+          scaleProgress: newProgress,
+          reviewPool: nextPool,
+          currentReviewIndex: Math.min(
+            prev.currentReviewIndex || 0,
+            Math.max(0, nextPool.length - 1)
+          ),
+        };
+      });
+    } else {
+      setPracticeState((prev) => {
+        const orderIndex = prev.practiceOrder[prev.currentScaleIndex];
+        const newProgress = [...prev.scaleProgress];
+        const scale = newProgress[orderIndex];
+
+        if (!scale) return prev;
+
+        didAccept = true;
+
+        const newCount = scale.successCount + 1;
+        const newCycleCompletions = (scale.cycleCompletions || 0) + 1;
+        const currentHistory = { ...(scale.history || {}) };
+        currentHistory[todayDayKey] = (currentHistory[todayDayKey] || 0) + 1;
+
+        newProgress[orderIndex] = {
+          ...scale,
+          successCount: newCount,
+          cycleCompletions: newCycleCompletions,
+          completed: true,
+          history: currentHistory,
+        };
+
+        // If this scale was in the review pool, remove it now that it passed
+        const nextPool = (prev.reviewPool || []).filter((name) => name !== scale.name);
+
+        return {
+          ...prev,
+          scaleProgress: newProgress,
+          reviewPool: nextPool,
+        };
+      });
+    }
 
     if (!didAccept) {
       acceptInProgressRef.current = false;
@@ -531,7 +630,9 @@ export default function Index() {
 
     // Move to next after a brief delay
     pendingNavigationRef.current = window.setTimeout(() => {
-      moveToNextScale();
+      if (!isReviewMode) {
+        moveToNextScale();
+      }
       pendingNavigationRef.current = null;
 
       const elapsed = Date.now() - lastAcceptAtRef.current;
@@ -547,11 +648,97 @@ export default function Index() {
         acceptUnlockTimeoutRef.current = null;
       }, remainingLock);
     }, 500);
-  }, [moveToNextScale, setDailyRepetitions, setPracticeState, todayDayKey]);
+  }, [
+    activeReviewScaleName,
+    fireConfetti,
+    isReviewMode,
+    moveToNextScale,
+    setDailyRepetitions,
+    setPracticeState,
+    todayDayKey,
+  ]);
 
   const handleDecline = useCallback(() => {
-    moveToNextScale();
-  }, [moveToNextScale]);
+    if (isReviewMode) {
+      setPracticeState((prev) => {
+        const pool = prev.reviewPool || [];
+        if (pool.length <= 1) return prev;
+        const nextIdx = ((prev.currentReviewIndex || 0) + 1) % pool.length;
+        return { ...prev, currentReviewIndex: nextIdx };
+      });
+      toast({
+        title: "Review Deferred",
+        description: `${currentScale?.name || 'Scale'} moved to the end of today's review queue.`,
+      });
+      return;
+    }
+
+    if (!currentScale) {
+      moveToNextScale();
+      return;
+    }
+
+    const scaleName = currentScale.name;
+    const isToday = practiceState.todayRetriesDate === todayDayKey;
+    const retriedToday = isToday ? (practiceState.todayRetries || []) : [];
+    const hasAlreadyRetried = retriedToday.includes(scaleName);
+
+    if (!hasAlreadyRetried) {
+      // First decline today: re-queue at end of today's remaining session
+      setPracticeState((prev) => {
+        const remainingToday = Math.max(1, dailyGoal - todayCompleted);
+        const targetPos = Math.min(
+          prev.practiceOrder.length,
+          prev.currentScaleIndex + remainingToday + 1
+        );
+        const newOrder = [...prev.practiceOrder];
+        newOrder.splice(targetPos, 0, currentOrderIndex);
+        const newRetries = [...retriedToday, scaleName];
+        const newPool = Array.from(new Set([...(prev.reviewPool || []), scaleName]));
+
+        return {
+          ...prev,
+          practiceOrder: newOrder,
+          currentScaleIndex: prev.currentScaleIndex + 1,
+          todayRetries: newRetries,
+          todayRetriesDate: todayDayKey,
+          reviewPool: newPool,
+        };
+      });
+
+      toast({
+        title: "Scale Queued for Retry",
+        description: `${scaleName} will reappear at the end of today's session.`,
+      });
+    } else {
+      // Already retried today: ensure saved in reviewPool for buffer day, and advance
+      setPracticeState((prev) => ({
+        ...prev,
+        reviewPool: Array.from(new Set([...(prev.reviewPool || []), scaleName])),
+      }));
+
+      toast({
+        title: "Saved for Buffer Day Review",
+        description: `${scaleName} will be reviewed on Day ${cycleDays}.`,
+      });
+
+      moveToNextScale();
+    }
+  }, [
+    currentOrderIndex,
+    currentScale,
+    cycleDays,
+    dailyGoal,
+    isReviewMode,
+    moveToNextScale,
+    practiceState.currentReviewIndex,
+    practiceState.reviewPool,
+    practiceState.todayRetries,
+    practiceState.todayRetriesDate,
+    setPracticeState,
+    todayCompleted,
+    todayDayKey,
+  ]);
 
   const handleResetStreak = useCallback(() => {
     setStreakState({
@@ -575,12 +762,23 @@ export default function Index() {
   const handleStartNewCycle = useCallback(
     (newCycleDays: number) => {
       recentFingerPatternsRef.current = [];
-      setRawSettings((prev) => ({ ...prev, cycleDays: newCycleDays }));
+      setRawSettings((prev) => ({
+        ...prev,
+        cycleDays: newCycleDays,
+        dailyGoal: prev.autoDailyGoal !== false
+          ? calculatePacedDailyGoal(prev.scales.length, newCycleDays)
+          : prev.dailyGoal,
+      }));
       setPracticeState((prev) => ({
         ...prev,
         cycleStartDate: getLocalDateString(),
         round: 1,
         currentScaleIndex: 0,
+        reviewPool: [],
+        todayRetries: [],
+        todayRetriesDate: todayDayKey,
+        currentReviewIndex: 0,
+        bonusRound: false,
         practiceOrder: shuffleArray(
           Array.from({ length: settings.scales.length }, (_, i) => i)
         ),
@@ -595,7 +793,7 @@ export default function Index() {
         description: `Started a fresh ${newCycleDays}-day practice cycle.`,
       });
     },
-    [settings.scales.length, setPracticeState, setRawSettings]
+    [setPracticeState, setRawSettings, settings.scales.length, todayDayKey]
   );
 
   const handleSettingsChange = useCallback(
@@ -767,24 +965,61 @@ export default function Index() {
                     />
                     <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
                       <span>
-                        Day {currentDayOfCycle} of {cycleDays} · {todayCompleted} of {dailyGoal} daily scales completed
+                        {isBufferDay ? (
+                          reviewPool.length > 0 && !practiceState.bonusRound ? (
+                            `Day ${currentDayOfCycle} of ${cycleDays} (Buffer & Review Day) · ${reviewPool.length} review scale${reviewPool.length === 1 ? '' : 's'} remaining`
+                          ) : (
+                            `Day ${currentDayOfCycle} of ${cycleDays} (Buffer & Rest Day) · Cycle complete with zero pending reviews`
+                          )
+                        ) : (
+                          `Day ${currentDayOfCycle} of ${cycleDays} · ${todayCompleted} of ${dailyGoal} daily scales completed`
+                        )}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Current Scale Card */}
-                {currentScale ? (
+                {/* Current Scale Card or Buffer Day Completion */}
+                {isBufferDay && reviewPool.length === 0 && !practiceState.bonusRound ? (
+                  <div className="w-full max-w-md mx-auto p-8 bg-card rounded-2xl border border-border material-shadow-xl text-center space-y-5 animate-scale-in">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-success/15 flex items-center justify-center text-success">
+                      <CheckCircle2 className="w-8 h-8" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h3 className="text-2xl font-bold text-foreground">Cycle Completed!</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Day {cycleDays} of {cycleDays} is your Buffer & Rest Day. You have played all {settings.scales.length} scales in this cycle with zero pending reviews.
+                      </p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">
+                      <Button
+                        onClick={() => handleStartNewCycle(cycleDays)}
+                        className="text-xs font-semibold h-10"
+                      >
+                        Start Next Cycle
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setPracticeState((prev) => ({ ...prev, bonusRound: true }))}
+                        className="text-xs font-semibold h-10"
+                      >
+                        Practice Bonus Round
+                      </Button>
+                    </div>
+                  </div>
+                ) : currentScale ? (
                   <ScaleCard
                     scaleName={currentScale.name}
                     successCount={currentScale.successCount}
                     cycleCompletions={currentScaleCycleCompletions}
                     cycleDays={cycleDays}
-                    currentRoundPosition={practiceState.currentScaleIndex + 1}
-                    totalInRound={practiceState.practiceOrder.length}
+                    currentRoundPosition={isReviewMode ? currentReviewIndex + 1 : practiceState.currentScaleIndex + 1}
+                    totalInRound={isReviewMode ? reviewPool.length : practiceState.practiceOrder.length}
                     onAccept={handleAccept}
                     onDecline={handleDecline}
                     acceptDisabled={isAcceptPending}
+                    isReviewMode={isReviewMode}
+                    isRetry={isCurrentScaleRetry}
                     fingerCombination={chosenFingerPattern}
                     fingerPatterns={settings.fingerPatterns}
                   />
@@ -828,6 +1063,7 @@ export default function Index() {
                   cycleStartDate={activeCycleStartDate}
                   cycleDays={cycleDays}
                   today={today}
+                  reviewPool={practiceState.reviewPool}
                   onOpenSettings={() => {
                     setSettingsInitialTab('scales');
                     setSettingsOpen(true);

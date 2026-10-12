@@ -16,7 +16,7 @@ interface AboutModalProps {
 const STEPS = [
   {
     title: 'Configure Your Scales & Goal',
-    description: 'Open Settings to customize your active scale syllabus and choose how many scales to practice each day.',
+    description: 'Open Settings to customize your scale syllabus and cycle length. Scaled automatically divides your scales evenly across the cycle, saving the final day as a Buffer & Review Day.',
     icon: Target,
   },
   {
@@ -26,7 +26,7 @@ const STEPS = [
   },
   {
     title: 'Practice & Record',
-    description: 'Play the prompted scale and click Accept for each clean run to mark it played and advance.',
+    description: 'Play the prompted scale and mark clean runs with Accept. Declined scales re-queue for retry later today or move to Buffer Day review.',
     icon: CheckCircle2,
   },
   {

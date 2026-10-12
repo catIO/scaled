@@ -251,6 +251,25 @@ export function getElapsedDays(cycleStartDate?: string, today: Date = new Date()
 }
 
 /**
+ * Calculates the daily scale goal required to finish all scales across the practice cycle,
+ * reserving the final day as a buffer / review day when cycle duration is more than 1 day.
+ */
+export function calculatePacedDailyGoal(totalScales: number, cycleDays: number = 7): number {
+  if (totalScales <= 0) return 1;
+  const safeCycleDays = Math.max(1, cycleDays || 7);
+  const practiceDays = safeCycleDays > 1 ? safeCycleDays - 1 : 1;
+  return Math.max(1, Math.ceil(totalScales / practiceDays));
+}
+
+/**
+ * Returns whether today is the buffer / review day of the active cycle.
+ */
+export function isCycleBufferDay(cycleDays: number = 7, currentDayOfCycle: number): boolean {
+  const safeCycleDays = Math.max(1, cycleDays || 7);
+  return safeCycleDays > 1 && currentDayOfCycle >= safeCycleDays;
+}
+
+/**
  * Migrates legacy backups (from older deployed versions that tracked successCount without history or dailyRepetitions)
  * so that practice streak, day of cycle, scale completion status, and history are faithfully restored.
  */
@@ -269,13 +288,18 @@ export function migrateLegacyBackup(
   const cycleDays = Number(importedSettings.cycleDays) || 7;
   const scaleCount = Array.isArray(importedSettings.scales) ? importedSettings.scales.length : 10;
   const inferredDailyGoal = Math.max(1, Math.round((scaleCount * repReq) / cycleDays));
-  const dailyGoal = Number.isFinite(rawDailyGoal) && rawDailyGoal > 0 ? rawDailyGoal : inferredDailyGoal;
+  const autoDailyGoal = importedSettings.autoDailyGoal !== false;
+  const pacedGoal = calculatePacedDailyGoal(scaleCount, cycleDays);
+  const dailyGoal = autoDailyGoal
+    ? pacedGoal
+    : (Number.isFinite(rawDailyGoal) && rawDailyGoal > 0 ? rawDailyGoal : inferredDailyGoal);
 
   const settings: PracticeSettings = {
     ...DEFAULT_SETTINGS,
     ...importedSettings,
     dailyGoal,
     cycleDays,
+    autoDailyGoal,
     metronome: importedSettings.metronome || DEFAULT_SETTINGS.metronome,
     fingerPatterns: importedSettings.fingerPatterns || [],
   };
@@ -343,6 +367,11 @@ export function migrateLegacyBackup(
     scaleProgress: migratedProgress,
     round,
     cycleStartDate,
+    reviewPool: Array.isArray(importedState.reviewPool) ? importedState.reviewPool : [],
+    todayRetries: Array.isArray(importedState.todayRetries) ? importedState.todayRetries : [],
+    todayRetriesDate: typeof importedState.todayRetriesDate === 'string' ? importedState.todayRetriesDate : undefined,
+    currentReviewIndex: typeof importedState.currentReviewIndex === 'number' ? importedState.currentReviewIndex : 0,
+    bonusRound: Boolean(importedState.bonusRound),
   };
 
   return {

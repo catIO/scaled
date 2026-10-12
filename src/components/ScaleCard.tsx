@@ -8,6 +8,7 @@ import { SCALE_DICTIONARY, getBaseScaleName, getOctaveCount, generateMultiOctave
 const ScaleNotationModal = lazy(() =>
   import('@/components/ScaleNotationModal').then((module) => ({ default: module.ScaleNotationModal }))
 );
+import { RotateCcw } from 'lucide-react';
 
 interface ScaleCardProps {
   scaleName: string;
@@ -20,6 +21,8 @@ interface ScaleCardProps {
   onDecline: () => void;
   isCompleted?: boolean;
   acceptDisabled?: boolean;
+  isReviewMode?: boolean;
+  isRetry?: boolean;
   /** When provided, this pattern is shown; otherwise a random one is chosen from fingerPatterns */
   fingerCombination?: string | null;
   fingerPatterns?: string[];
@@ -36,6 +39,8 @@ export function ScaleCard({
   onDecline,
   isCompleted = false,
   acceptDisabled = false,
+  isReviewMode = false,
+  isRetry = false,
   fingerCombination: fingerCombinationProp,
   fingerPatterns,
 }: ScaleCardProps) {
@@ -74,9 +79,23 @@ export function ScaleCard({
         </button>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-            Practice Scale
-          </p>
+          <div className="flex items-center justify-center gap-2">
+            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+              {isReviewMode ? 'Review Scale' : 'Practice Scale'}
+            </p>
+            {isReviewMode && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <RotateCcw className="w-3 h-3" />
+                <span>Buffer Review</span>
+              </span>
+            )}
+            {!isReviewMode && isRetry && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <RotateCcw className="w-3 h-3" />
+                <span>Retry</span>
+              </span>
+            )}
+          </div>
           <h2 className="text-4xl font-bold text-card-foreground flex flex-col items-center gap-1">
             <span>{scaleName.split(' - ')[0]}</span>
             {scaleName.includes(' - ') && (
@@ -119,7 +138,7 @@ export function ScaleCard({
           <div className="flex gap-3 justify-center pt-2">
             <Button
               onClick={onDecline}
-              aria-label="Skip scale"
+              aria-label={isReviewMode ? "Skip to next review scale" : isRetry ? "Send to Buffer Day review" : "Decline scale (retry later today)"}
               className="w-16 h-16 rounded-xl bg-destructive text-white hover:bg-destructive/90 [&_svg]:!w-8 [&_svg]:!h-9"
             >
               <MdClose />
