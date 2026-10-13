@@ -304,7 +304,7 @@ export function Settings({
       const scaleNameWithOctaves = `${newScale.trim()} - ${octaves} Octave${octaves === '1' ? '' : 's'}`;
       if (!settings.scales.includes(scaleNameWithOctaves)) {
         const newScales = [...settings.scales, scaleNameWithOctaves];
-        const newDailyGoal = settings.autoDailyGoal !== false
+        const newDailyGoal = settings.autoDailyGoal
           ? calculatePacedDailyGoal(newScales.length, cycleDays)
           : settings.dailyGoal;
         onSettingsChange({
@@ -320,7 +320,7 @@ export function Settings({
 
   const removeScale = (scale: string) => {
     const newScales = settings.scales.filter((s) => s !== scale);
-    const newDailyGoal = settings.autoDailyGoal !== false
+    const newDailyGoal = settings.autoDailyGoal
       ? calculatePacedDailyGoal(newScales.length, cycleDays)
       : settings.dailyGoal;
     onSettingsChange({
@@ -486,7 +486,7 @@ export function Settings({
               <Slider
                 value={[cycleDays]}
                 onValueChange={([value]) => {
-                  const newDailyGoal = settings.autoDailyGoal !== false
+                  const newDailyGoal = settings.autoDailyGoal
                     ? calculatePacedDailyGoal(settings.scales.length, value)
                     : settings.dailyGoal;
                   onSettingsChange({
@@ -517,7 +517,7 @@ export function Settings({
                 </div>
                 <Switch
                   id="auto-daily-goal-toggle"
-                  checked={settings.autoDailyGoal !== false}
+                  checked={Boolean(settings.autoDailyGoal)}
                   onCheckedChange={(checked) => {
                     const newDailyGoal = checked
                       ? calculatePacedDailyGoal(settings.scales.length, cycleDays)
@@ -536,7 +536,7 @@ export function Settings({
                   <Label className="text-sm font-medium text-foreground">Daily Goal</Label>
                   <span className="text-sm font-bold text-primary">
                     {settings.dailyGoal} / Day
-                    {settings.autoDailyGoal !== false && (
+                    {Boolean(settings.autoDailyGoal) && (
                       <span className="ml-1 text-xs font-normal text-muted-foreground">(Auto-paced)</span>
                     )}
                   </span>

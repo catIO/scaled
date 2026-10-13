@@ -177,17 +177,11 @@ export default function Index() {
     }
 
     if (migrated.autoDailyGoal === undefined) {
-      migrated.autoDailyGoal = true;
+      migrated.autoDailyGoal = false;
       needsUpdate = true;
     }
 
-    if (migrated.autoDailyGoal) {
-      const paced = calculatePacedDailyGoal(migrated.scales?.length || 1, migrated.cycleDays);
-      if (migrated.dailyGoal !== paced) {
-        migrated.dailyGoal = paced;
-        needsUpdate = true;
-      }
-    } else if (!migrated.dailyGoal || !Number.isFinite(migrated.dailyGoal) || migrated.dailyGoal < 1) {
+    if (!migrated.dailyGoal || !Number.isFinite(migrated.dailyGoal) || migrated.dailyGoal < 1) {
       migrated.dailyGoal = 10;
       needsUpdate = true;
     }

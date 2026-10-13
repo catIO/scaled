@@ -50,7 +50,7 @@ export const DEFAULT_SETTINGS: PracticeSettings = {
   scales: DEFAULT_SCALES,
   dailyGoal: 10,
   cycleDays: 7,
-  autoDailyGoal: true,
+  autoDailyGoal: false,
   metronome: {
     enabled: true,
     bpm: 80,
