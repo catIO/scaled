@@ -2,10 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import { MdSettings, MdAdd, MdDelete, MdFileUpload, MdFileDownload } from 'react-icons/md';
 import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
-import { getLocalDateString, getElapsedDays, calculatePacedDailyGoal } from '@/lib/dateUtils';
+import { getLocalDateString, getElapsedDays } from '@/lib/dateUtils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -51,7 +50,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Info, ExternalLink, Flame, AlertTriangle, RotateCcw } from "lucide-react";
+import { Check, ChevronsUpDown, Info, ExternalLink, Flame, AlertTriangle, RotateCcw, Minus, Plus, Target, Calendar } from "lucide-react";
 import { UNIQUE_SCALE_NAMES } from '@/lib/notation';
 import { PracticeSettings, PracticeState } from '@/types/practice';
 
@@ -154,6 +153,96 @@ export function Settings({
 
   const cycleDays = settings.cycleDays || 7;
   const elapsedDays = getElapsedDays(practiceState.cycleStartDate);
+
+  const [dailyGoalInput, setDailyGoalInput] = useState(String(settings.dailyGoal || 15));
+  const [cycleDaysInput, setCycleDaysInput] = useState(String(cycleDays));
+
+  useEffect(() => {
+    setDailyGoalInput(String(settings.dailyGoal || 15));
+  }, [settings.dailyGoal]);
+
+  useEffect(() => {
+    setCycleDaysInput(String(cycleDays));
+  }, [cycleDays]);
+
+  const handleDailyGoalChange = (val: string) => {
+    setDailyGoalInput(val);
+    const parsed = parseInt(val, 10);
+    if (!isNaN(parsed) && parsed >= 1) {
+      onSettingsChange({
+        ...settings,
+        dailyGoal: Math.min(60, parsed),
+      });
+    }
+  };
+
+  const handleDailyGoalBlur = () => {
+    const parsed = parseInt(dailyGoalInput, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      const fallback = settings.dailyGoal || 1;
+      setDailyGoalInput(String(fallback));
+      onSettingsChange({
+        ...settings,
+        dailyGoal: fallback,
+      });
+    } else {
+      const clamped = Math.max(1, Math.min(60, parsed));
+      setDailyGoalInput(String(clamped));
+      onSettingsChange({
+        ...settings,
+        dailyGoal: clamped,
+      });
+    }
+  };
+
+  const stepDailyGoal = (delta: number) => {
+    const current = settings.dailyGoal || 1;
+    const next = Math.max(1, Math.min(60, current + delta));
+    setDailyGoalInput(String(next));
+    onSettingsChange({
+      ...settings,
+      dailyGoal: next,
+    });
+  };
+
+  const handleCycleDaysChange = (val: string) => {
+    setCycleDaysInput(val);
+    const parsed = parseInt(val, 10);
+    if (!isNaN(parsed) && parsed >= 1) {
+      onSettingsChange({
+        ...settings,
+        cycleDays: Math.min(60, parsed),
+      });
+    }
+  };
+
+  const handleCycleDaysBlur = () => {
+    const parsed = parseInt(cycleDaysInput, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      const fallback = cycleDays || 7;
+      setCycleDaysInput(String(fallback));
+      onSettingsChange({
+        ...settings,
+        cycleDays: fallback,
+      });
+    } else {
+      const clamped = Math.max(1, Math.min(60, parsed));
+      setCycleDaysInput(String(clamped));
+      onSettingsChange({
+        ...settings,
+        cycleDays: clamped,
+      });
+    }
+  };
+
+  const stepCycleDays = (delta: number) => {
+    const next = Math.max(1, Math.min(60, cycleDays + delta));
+    setCycleDaysInput(String(next));
+    onSettingsChange({
+      ...settings,
+      cycleDays: next,
+    });
+  };
 
   useEffect(() => {
     if (open) {
@@ -304,13 +393,9 @@ export function Settings({
       const scaleNameWithOctaves = `${newScale.trim()} - ${octaves} Octave${octaves === '1' ? '' : 's'}`;
       if (!settings.scales.includes(scaleNameWithOctaves)) {
         const newScales = [...settings.scales, scaleNameWithOctaves];
-        const newDailyGoal = settings.autoDailyGoal
-          ? calculatePacedDailyGoal(newScales.length, cycleDays)
-          : settings.dailyGoal;
         onSettingsChange({
           ...settings,
           scales: newScales,
-          dailyGoal: newDailyGoal,
         });
         setNewScale('');
         setOctaves('1');
@@ -320,13 +405,9 @@ export function Settings({
 
   const removeScale = (scale: string) => {
     const newScales = settings.scales.filter((s) => s !== scale);
-    const newDailyGoal = settings.autoDailyGoal
-      ? calculatePacedDailyGoal(newScales.length, cycleDays)
-      : settings.dailyGoal;
     onSettingsChange({
       ...settings,
       scales: newScales,
-      dailyGoal: newDailyGoal,
     });
   };
 
@@ -475,114 +556,126 @@ export function Settings({
 
           {/* Goals Tab */}
           <TabsContent value="goals" className="space-y-6 mt-4">
-            {/* Practice Cycle */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <Label className="text-sm font-medium">Practice Cycle</Label>
-                <span className="text-sm font-bold text-primary">
-                  {cycleDays} {cycleDays === 1 ? 'Day' : 'Days'}
-                </span>
-              </div>
-              <Slider
-                value={[cycleDays]}
-                onValueChange={([value]) => {
-                  const newDailyGoal = settings.autoDailyGoal
-                    ? calculatePacedDailyGoal(settings.scales.length, value)
-                    : settings.dailyGoal;
-                  onSettingsChange({
-                    ...settings,
-                    cycleDays: value,
-                    dailyGoal: newDailyGoal,
-                  });
-                }}
-                min={1}
-                max={30}
-                step={1}
-              />
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Define how many days your practice cycle lasts (e.g. 7 days for a weekly cycle).
-              </p>
-            </div>
-
-            {/* Daily Goal */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5 pr-4">
-                  <Label htmlFor="auto-daily-goal-toggle" className="text-sm font-medium">
-                    Auto-Pace Cycle
-                  </Label>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Divides {settings.scales.length} scale{settings.scales.length === 1 ? '' : 's'} across {cycleDays > 1 ? `${cycleDays - 1} days` : '1 day'}, leaving Day {cycleDays} as a Buffer & Review Day.
-                  </p>
-                </div>
-                <Switch
-                  id="auto-daily-goal-toggle"
-                  checked={Boolean(settings.autoDailyGoal)}
-                  onCheckedChange={(checked) => {
-                    const newDailyGoal = checked
-                      ? calculatePacedDailyGoal(settings.scales.length, cycleDays)
-                      : settings.dailyGoal;
-                    onSettingsChange({
-                      ...settings,
-                      autoDailyGoal: checked,
-                      dailyGoal: newDailyGoal,
-                    });
-                  }}
-                />
-              </div>
-
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-foreground">Daily Goal</Label>
-                  <span className="text-sm font-bold text-primary">
-                    {settings.dailyGoal} / Day
-                    {Boolean(settings.autoDailyGoal) && (
-                      <span className="ml-1 text-xs font-normal text-muted-foreground">(Auto-paced)</span>
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <Slider
-                    value={[settings.dailyGoal]}
-                    onValueChange={([value]) =>
-                      onSettingsChange({
-                        ...settings,
-                        autoDailyGoal: false,
-                        dailyGoal: value,
-                      })
-                    }
-                    min={1}
-                    max={30}
-                    step={1}
-                    className="flex-1"
-                  />
-                  <span className="w-16 text-right text-base font-bold text-primary">
-                    {settings.dailyGoal} / Day
-                  </span>
-                </div>
-                {settings.autoDailyGoal === false && settings.dailyGoal * cycleDays < settings.scales.length && (
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2.5 text-xs text-amber-700 dark:text-amber-400">
-                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <div className="space-y-1">
-                      <p>
-                        At {settings.dailyGoal} scales/day, you will only practice {settings.dailyGoal * cycleDays} of {settings.scales.length} scales within {cycleDays} days.
-                      </p>
-                      <button
+            {/* Side-by-side Goal & Cycle Inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Daily Goal Input Card */}
+              <div className="group relative rounded-xl border border-input/80 bg-muted/20 hover:bg-muted/30 focus-within:bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all p-3.5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label
+                      htmlFor="daily-goal-input"
+                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider group-focus-within:text-primary transition-colors cursor-pointer"
+                    >
+                      Daily Goal
+                    </Label>
+                    <Target className="w-3.5 h-3.5 text-muted-foreground/60 group-focus-within:text-primary transition-colors" />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-baseline gap-1.5 flex-1 min-w-0">
+                      <Input
+                        id="daily-goal-input"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={60}
+                        value={dailyGoalInput}
+                        onChange={(e) => handleDailyGoalChange(e.target.value)}
+                        onBlur={handleDailyGoalBlur}
+                        className="h-9 w-20 text-2xl font-bold tracking-tight bg-transparent border-0 p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                        scales / day
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
                         type="button"
-                        onClick={() =>
-                          onSettingsChange({
-                            ...settings,
-                            autoDailyGoal: true,
-                            dailyGoal: calculatePacedDailyGoal(settings.scales.length, cycleDays),
-                          })
-                        }
-                        className="font-semibold underline hover:no-underline text-primary"
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 rounded-lg border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        onClick={() => stepDailyGoal(-1)}
+                        disabled={settings.dailyGoal <= 1}
+                        aria-label="Decrease daily goal"
                       >
-                        Set to recommended {calculatePacedDailyGoal(settings.scales.length, cycleDays)} scales/day
-                      </button>
+                        <Minus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 rounded-lg border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        onClick={() => stepDailyGoal(1)}
+                        disabled={settings.dailyGoal >= 60}
+                        aria-label="Increase daily goal"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   </div>
-                )}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2.5 leading-snug">
+                  Choose how many scales to practice each day.
+                </p>
+              </div>
+
+              {/* Practice Cycle Input Card */}
+              <div className="group relative rounded-xl border border-input/80 bg-muted/20 hover:bg-muted/30 focus-within:bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all p-3.5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label
+                      htmlFor="cycle-days-input"
+                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider group-focus-within:text-primary transition-colors cursor-pointer"
+                    >
+                      Practice Cycle
+                    </Label>
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground/60 group-focus-within:text-primary transition-colors" />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-baseline gap-1.5 flex-1 min-w-0">
+                      <Input
+                        id="cycle-days-input"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={60}
+                        value={cycleDaysInput}
+                        onChange={(e) => handleCycleDaysChange(e.target.value)}
+                        onBlur={handleCycleDaysBlur}
+                        className="h-9 w-20 text-2xl font-bold tracking-tight bg-transparent border-0 p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                        {cycleDays === 1 ? 'day' : 'days'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 rounded-lg border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        onClick={() => stepCycleDays(-1)}
+                        disabled={cycleDays <= 1}
+                        aria-label="Decrease practice cycle days"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 rounded-lg border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        onClick={() => stepCycleDays(1)}
+                        disabled={cycleDays >= 60}
+                        aria-label="Increase practice cycle days"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2.5 leading-snug">
+                  Days in one cycle before resetting.
+                </p>
               </div>
             </div>
 

@@ -176,13 +176,16 @@ export default function Index() {
       needsUpdate = true;
     }
 
-    if (migrated.autoDailyGoal === undefined) {
-      migrated.autoDailyGoal = false;
+    if ('autoDailyGoal' in migrated) {
+      if (migrated.dailyGoal === 3) {
+        migrated.dailyGoal = 15;
+      }
+      delete migrated.autoDailyGoal;
       needsUpdate = true;
     }
 
     if (!migrated.dailyGoal || !Number.isFinite(migrated.dailyGoal) || migrated.dailyGoal < 1) {
-      migrated.dailyGoal = 10;
+      migrated.dailyGoal = 15;
       needsUpdate = true;
     }
 
@@ -759,9 +762,6 @@ export default function Index() {
       setRawSettings((prev) => ({
         ...prev,
         cycleDays: newCycleDays,
-        dailyGoal: prev.autoDailyGoal !== false
-          ? calculatePacedDailyGoal(prev.scales.length, newCycleDays)
-          : prev.dailyGoal,
       }));
       setPracticeState((prev) => ({
         ...prev,

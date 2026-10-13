@@ -16,7 +16,7 @@ interface AboutModalProps {
 const STEPS = [
   {
     title: 'Configure Your Scales & Goal',
-    description: 'Open Settings to customize your scale syllabus and cycle length. Scaled automatically divides your scales evenly across the cycle, saving the final day as a Buffer & Review Day.',
+    description: 'Open Settings to customize your scale syllabus, daily scale goal, and cycle length.',
     icon: Target,
   },
   {

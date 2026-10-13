@@ -16,7 +16,7 @@ export default function About() {
                         <h2 className="text-xl font-semibold text-foreground">How To Use This App</h2>
                         <ol className="list-decimal pl-6 space-y-2 text-sm text-muted-foreground">
                             <li>Open Settings and review your scale list in the Scales tab.</li>
-                            <li>In Goals, set your practice cycle duration. Auto-pacing evenly divides your scales across the cycle and reserves the final day as a Buffer & Review Day for failed scales.</li>
+                            <li>In Goals, set how many scales you want to practice each day, and choose your cycle length.</li>
                             <li>In Finger Patterns, pick the right-hand patterns you want to cycle through while practicing.</li>
                             <li>Practice the current scale and mark each clean run with the check button. Declined scales are re-queued for retry today or reviewed on Buffer Day.</li>
                             <li>Scales are randomly chosen without repeating until all scales have been played once.</li>
