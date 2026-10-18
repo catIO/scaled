@@ -263,10 +263,10 @@ export function calculatePacedDailyGoal(totalScales: number, cycleDays: number =
 
 /**
  * Returns whether today is the buffer / review day of the active cycle.
+ * Buffer day lockout has been removed so all cycle days are full practice days.
  */
-export function isCycleBufferDay(cycleDays: number = 7, currentDayOfCycle: number): boolean {
-  const safeCycleDays = Math.max(1, cycleDays || 7);
-  return safeCycleDays > 1 && currentDayOfCycle >= safeCycleDays;
+export function isCycleBufferDay(_cycleDays: number = 7, _currentDayOfCycle: number): boolean {
+  return false;
 }
 
 /**
@@ -286,6 +286,7 @@ export function migrateLegacyBackup(
   const rawDailyGoal = Number(importedSettings.dailyGoal);
   const repReq = Number(importedSettings.repetitionsRequired) || 3;
   const cycleDays = Number(importedSettings.cycleDays) || 7;
+  const targetPlays = Number(importedSettings.targetPlays) || 6;
   const scaleCount = Array.isArray(importedSettings.scales) ? importedSettings.scales.length : 10;
   const inferredDailyGoal = Math.max(1, Math.round((scaleCount * repReq) / cycleDays));
   const autoDailyGoal = importedSettings.autoDailyGoal !== false;
@@ -299,6 +300,7 @@ export function migrateLegacyBackup(
     ...importedSettings,
     dailyGoal,
     cycleDays,
+    targetPlays,
     autoDailyGoal,
     metronome: importedSettings.metronome || DEFAULT_SETTINGS.metronome,
     fingerPatterns: importedSettings.fingerPatterns || [],

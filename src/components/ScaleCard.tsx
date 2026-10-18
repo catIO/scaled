@@ -15,6 +15,7 @@ interface ScaleCardProps {
   successCount: number;
   cycleCompletions?: number;
   cycleDays?: number;
+  targetPlays?: number;
   currentRoundPosition?: number;
   totalInRound?: number;
   onAccept: () => void;
@@ -33,6 +34,7 @@ export function ScaleCard({
   successCount,
   cycleCompletions = 0,
   cycleDays = 7,
+  targetPlays,
   currentRoundPosition,
   totalInRound,
   onAccept,
@@ -111,28 +113,33 @@ export function ScaleCard({
           )}
         </div>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex items-center justify-center gap-2 py-4 pt-2 cursor-default">
-              <div className="flex gap-1">
-                {Array.from({ length: cycleDays }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-4 h-4 rounded-full transition-all duration-300 ${
-                      i < cycleCompletions ? 'bg-success scale-110' : 'bg-foreground/20'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="text-sm text-muted-foreground ml-2">
-                {cycleCompletions} / {cycleDays}
-              </span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Practiced {cycleCompletions} of {cycleDays} in current cycle ({successCount} all-time plays)</p>
-          </TooltipContent>
-        </Tooltip>
+        {(() => {
+          const effectiveTarget = targetPlays ?? (cycleDays > 1 ? cycleDays - 1 : 1);
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center gap-2 py-4 pt-2 cursor-default">
+                  <div className="flex gap-1">
+                    {Array.from({ length: effectiveTarget }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-4 h-4 rounded-full transition-all duration-300 ${
+                          i < cycleCompletions ? 'bg-success scale-110' : 'bg-foreground/20'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm text-muted-foreground ml-2">
+                    {cycleCompletions} / {effectiveTarget}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Practiced {cycleCompletions} of {effectiveTarget} in current cycle ({successCount} all-time plays)</p>
+              </TooltipContent>
+            </Tooltip>
+          );
+        })()}
 
         {!isCompleted && (
           <div className="flex gap-3 justify-center pt-2">

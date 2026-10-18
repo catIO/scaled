@@ -18,6 +18,7 @@ export interface PracticeSettings {
   scales: string[];
   dailyGoal: number; // Number of scales to practice every day
   cycleDays: number; // Duration of practice cycle in days (default: 7)
+  targetPlays?: number; // Target completions per scale in cycle (default: 6)
   autoDailyGoal?: boolean; // Automatically divide scales across cycle days with buffer day
   metronome: MetronomeSettings;
   fingerPatterns: string[]; // Array of finger patterns to use for all scales
@@ -48,8 +49,9 @@ export const DEFAULT_SCALES = [
 
 export const DEFAULT_SETTINGS: PracticeSettings = {
   scales: DEFAULT_SCALES,
-  dailyGoal: 10,
+  dailyGoal: 15,
   cycleDays: 7,
+  targetPlays: 6,
   autoDailyGoal: false,
   metronome: {
     enabled: true,

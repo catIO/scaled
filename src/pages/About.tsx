@@ -18,7 +18,7 @@ export default function About() {
                             <li>Open Settings and review your scale list in the Scales tab.</li>
                             <li>In Goals, set how many scales you want to practice each day, and choose your cycle length.</li>
                             <li>In Finger Patterns, pick the right-hand patterns you want to cycle through while practicing.</li>
-                            <li>Practice the current scale and mark each clean run with the check button. Declined scales are re-queued for retry today or reviewed on Buffer Day.</li>
+                            <li>Practice the current scale and mark each clean run with the check button. Declined scales are re-queued for retry today or flagged for review.</li>
                             <li>Scales are randomly chosen without repeating until all scales have been played once.</li>
                             <li>Track your daily progress and streak in the sidebar. Streaks do not reset automatically.</li>
                             <li>When you reach today's target, confetti confirms your daily goal is complete.</li>

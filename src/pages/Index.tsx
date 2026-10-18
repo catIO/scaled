@@ -176,6 +176,11 @@ export default function Index() {
       needsUpdate = true;
     }
 
+    if (!migrated.targetPlays || !Number.isFinite(migrated.targetPlays) || migrated.targetPlays < 1) {
+      migrated.targetPlays = 6;
+      needsUpdate = true;
+    }
+
     if ('autoDailyGoal' in migrated) {
       if (migrated.dailyGoal === 3) {
         migrated.dailyGoal = 15;
@@ -321,8 +326,9 @@ export default function Index() {
   const today = useMemo(() => new Date(), []);
   const todayDayKey = useMemo(() => getDayKey(today), [today]);
   const todayCompleted = dailyRepetitions[todayDayKey] || 0;
-  const dailyGoal = settings.dailyGoal || 10;
+  const dailyGoal = settings.dailyGoal || 15;
   const cycleDays = settings.cycleDays || 7;
+  const targetPlays = settings.targetPlays ?? 6;
   const activeCycleStartDate = useMemo(() => {
     return getCurrentCycleStartDate(practiceState.cycleStartDate, cycleDays, today);
   }, [practiceState.cycleStartDate, cycleDays, today]);
@@ -715,8 +721,8 @@ export default function Index() {
       }));
 
       toast({
-        title: "Saved for Buffer Day Review",
-        description: `${scaleName} will be reviewed on Day ${cycleDays}.`,
+        title: "Saved for Review",
+        description: `${scaleName} will be queued for review.`,
       });
 
       moveToNextScale();
@@ -724,12 +730,9 @@ export default function Index() {
   }, [
     currentOrderIndex,
     currentScale,
-    cycleDays,
     dailyGoal,
     isReviewMode,
     moveToNextScale,
-    practiceState.currentReviewIndex,
-    practiceState.reviewPool,
     practiceState.todayRetries,
     practiceState.todayRetriesDate,
     setPracticeState,
@@ -959,54 +962,20 @@ export default function Index() {
                     />
                     <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
                       <span>
-                        {isBufferDay ? (
-                          reviewPool.length > 0 && !practiceState.bonusRound ? (
-                            `Day ${currentDayOfCycle} of ${cycleDays} (Buffer & Review Day) · ${reviewPool.length} review scale${reviewPool.length === 1 ? '' : 's'} remaining`
-                          ) : (
-                            `Day ${currentDayOfCycle} of ${cycleDays} (Buffer & Rest Day) · Cycle complete with zero pending reviews`
-                          )
-                        ) : (
-                          `Day ${currentDayOfCycle} of ${cycleDays} · ${todayCompleted} of ${dailyGoal} daily scales completed`
-                        )}
+                        Day {currentDayOfCycle} of {cycleDays} · {todayCompleted} of {dailyGoal} daily scales completed
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Current Scale Card or Buffer Day Completion */}
-                {isBufferDay && reviewPool.length === 0 && !practiceState.bonusRound ? (
-                  <div className="w-full max-w-md mx-auto p-8 bg-card rounded-2xl border border-border material-shadow-xl text-center space-y-5 animate-scale-in">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-success/15 flex items-center justify-center text-success">
-                      <CheckCircle2 className="w-8 h-8" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <h3 className="text-2xl font-bold text-foreground">Cycle Completed!</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        Day {cycleDays} of {cycleDays} is your Buffer & Rest Day. You have played all {settings.scales.length} scales in this cycle with zero pending reviews.
-                      </p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">
-                      <Button
-                        onClick={() => handleStartNewCycle(cycleDays)}
-                        className="text-xs font-semibold h-10"
-                      >
-                        Start Next Cycle
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setPracticeState((prev) => ({ ...prev, bonusRound: true }))}
-                        className="text-xs font-semibold h-10"
-                      >
-                        Practice Bonus Round
-                      </Button>
-                    </div>
-                  </div>
-                ) : currentScale ? (
+                {/* Current Scale Card */}
+                {currentScale ? (
                   <ScaleCard
                     scaleName={currentScale.name}
                     successCount={currentScale.successCount}
                     cycleCompletions={currentScaleCycleCompletions}
                     cycleDays={cycleDays}
+                    targetPlays={targetPlays}
                     currentRoundPosition={isReviewMode ? currentReviewIndex + 1 : practiceState.currentScaleIndex + 1}
                     totalInRound={isReviewMode ? reviewPool.length : practiceState.practiceOrder.length}
                     onAccept={handleAccept}
@@ -1056,6 +1025,7 @@ export default function Index() {
                   useStreak={settings.useStreak !== false}
                   cycleStartDate={activeCycleStartDate}
                   cycleDays={cycleDays}
+                  targetPlays={targetPlays}
                   today={today}
                   reviewPool={practiceState.reviewPool}
                   onOpenSettings={() => {

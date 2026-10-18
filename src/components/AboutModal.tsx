@@ -26,7 +26,7 @@ const STEPS = [
   },
   {
     title: 'Practice & Record',
-    description: 'Play the prompted scale and mark clean runs with Accept. Declined scales re-queue for retry later today or move to Buffer Day review.',
+    description: 'Play the prompted scale and mark clean runs with Accept. Declined scales re-queue for retry later today or move to the review list.',
     icon: CheckCircle2,
   },
   {

@@ -25,6 +25,7 @@ interface ProgressTrackerProps {
   useStreak?: boolean;
   cycleStartDate?: string;
   cycleDays?: number;
+  targetPlays?: number;
   today?: Date;
   reviewPool?: string[];
 }
@@ -42,6 +43,7 @@ export function ProgressTracker({
   useStreak = true,
   cycleStartDate,
   cycleDays = 7,
+  targetPlays,
   today,
   reviewPool = [],
 }: ProgressTrackerProps) {
@@ -119,14 +121,15 @@ export function ProgressTracker({
               }
             : null;
 
+          const effectiveTarget = targetPlays ?? (cycleDays > 1 ? cycleDays - 1 : 1);
           const cyclePlays = getScaleCycleCompletions(
             scale.history,
             cycleStartDate,
             cycleDays,
             today
           );
-          const isScaleCompleted = cyclePlays >= cycleDays;
-          const progress = Math.min(100, (cyclePlays / cycleDays) * 100);
+          const isScaleCompleted = cyclePlays >= effectiveTarget;
+          const progress = Math.min(100, (cyclePlays / effectiveTarget) * 100);
 
           return (
             <div
@@ -168,11 +171,11 @@ export function ProgressTracker({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="text-xs text-muted-foreground cursor-default font-medium">
-                        {cyclePlays}/{cycleDays}
+                        {cyclePlays}/{effectiveTarget}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Practiced {cyclePlays} of {cycleDays} in current cycle ({scale.successCount || 0} all-time)</p>
+                      <p>Practiced {cyclePlays} of {effectiveTarget} in current cycle ({scale.successCount || 0} all-time)</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>

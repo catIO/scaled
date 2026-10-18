@@ -50,7 +50,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Info, ExternalLink, Flame, AlertTriangle, RotateCcw, Minus, Plus, Target, Calendar } from "lucide-react";
+import { Check, ChevronsUpDown, Info, ExternalLink, Flame, AlertTriangle, RotateCcw, Minus, Plus, Target, Calendar, CheckCircle2 } from "lucide-react";
 import { UNIQUE_SCALE_NAMES } from '@/lib/notation';
 import { PracticeSettings, PracticeState } from '@/types/practice';
 
@@ -79,6 +79,7 @@ const isValidBackup = (data: unknown): data is BackupData => {
   if (!Array.isArray(settings.scales)) return false;
   if (!settings.scales.every((s: unknown) => typeof s === 'string')) return false;
   if (settings.cycleDays !== undefined && (typeof settings.cycleDays !== 'number' || settings.cycleDays < 1)) return false;
+  if (settings.targetPlays !== undefined && (typeof settings.targetPlays !== 'number' || settings.targetPlays < 1)) return false;
 
   if (!settings.metronome || typeof settings.metronome !== 'object') return false;
   if (typeof settings.metronome.enabled !== 'boolean') return false;
@@ -152,10 +153,12 @@ export function Settings({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const cycleDays = settings.cycleDays || 7;
+  const targetPlays = settings.targetPlays ?? 6;
   const elapsedDays = getElapsedDays(practiceState.cycleStartDate);
 
   const [dailyGoalInput, setDailyGoalInput] = useState(String(settings.dailyGoal || 15));
   const [cycleDaysInput, setCycleDaysInput] = useState(String(cycleDays));
+  const [targetPlaysInput, setTargetPlaysInput] = useState(String(targetPlays));
 
   useEffect(() => {
     setDailyGoalInput(String(settings.dailyGoal || 15));
@@ -164,6 +167,10 @@ export function Settings({
   useEffect(() => {
     setCycleDaysInput(String(cycleDays));
   }, [cycleDays]);
+
+  useEffect(() => {
+    setTargetPlaysInput(String(targetPlays));
+  }, [targetPlays]);
 
   const handleDailyGoalChange = (val: string) => {
     setDailyGoalInput(val);
@@ -244,6 +251,45 @@ export function Settings({
     });
   };
 
+  const handleTargetPlaysChange = (val: string) => {
+    setTargetPlaysInput(val);
+    const parsed = parseInt(val, 10);
+    if (!isNaN(parsed) && parsed >= 1) {
+      onSettingsChange({
+        ...settings,
+        targetPlays: Math.min(60, parsed),
+      });
+    }
+  };
+
+  const handleTargetPlaysBlur = () => {
+    const parsed = parseInt(targetPlaysInput, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      const fallback = targetPlays || 6;
+      setTargetPlaysInput(String(fallback));
+      onSettingsChange({
+        ...settings,
+        targetPlays: fallback,
+      });
+    } else {
+      const clamped = Math.max(1, Math.min(60, parsed));
+      setTargetPlaysInput(String(clamped));
+      onSettingsChange({
+        ...settings,
+        targetPlays: clamped,
+      });
+    }
+  };
+
+  const stepTargetPlays = (delta: number) => {
+    const next = Math.max(1, Math.min(60, targetPlays + delta));
+    setTargetPlaysInput(String(next));
+    onSettingsChange({
+      ...settings,
+      targetPlays: next,
+    });
+  };
+
   useEffect(() => {
     if (open) {
       setActiveTab(initialTab || 'scales');
@@ -318,6 +364,9 @@ export function Settings({
           }
           if (!importedSettings.cycleDays || importedSettings.cycleDays < 1) {
             importedSettings.cycleDays = 7;
+          }
+          if (!importedSettings.targetPlays || importedSettings.targetPlays < 1) {
+            importedSettings.targetPlays = 6;
           }
           if (!importedState.cycleStartDate) {
             importedState.cycleStartDate = getLocalDateString();
@@ -557,7 +606,7 @@ export function Settings({
           {/* Goals Tab */}
           <TabsContent value="goals" className="space-y-6 mt-4">
             {/* Side-by-side Goal & Cycle Inputs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Daily Goal Input Card */}
               <div className="group relative rounded-xl border border-input/80 bg-muted/20 hover:bg-muted/30 focus-within:bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all p-3.5 flex flex-col justify-between">
                 <div>
@@ -677,6 +726,66 @@ export function Settings({
                   Days in one cycle before resetting.
                 </p>
               </div>
+
+              {/* Target Plays per Scale Input Card */}
+              <div className="group relative rounded-xl border border-input/80 bg-muted/20 hover:bg-muted/30 focus-within:bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all p-3.5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label
+                      htmlFor="target-plays-input"
+                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider group-focus-within:text-primary transition-colors cursor-pointer"
+                    >
+                      Cycle Target
+                    </Label>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-muted-foreground/60 group-focus-within:text-primary transition-colors" />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-baseline gap-1.5 flex-1 min-w-0">
+                      <Input
+                        id="target-plays-input"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={60}
+                        value={targetPlaysInput}
+                        onChange={(e) => handleTargetPlaysChange(e.target.value)}
+                        onBlur={handleTargetPlaysBlur}
+                        className="h-9 w-20 text-2xl font-bold tracking-tight bg-transparent border-0 p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                        {targetPlays === 1 ? 'play / scale' : 'plays / scale'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 rounded-lg border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        onClick={() => stepTargetPlays(-1)}
+                        disabled={targetPlays <= 1}
+                        aria-label="Decrease cycle target plays"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 rounded-lg border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        onClick={() => stepTargetPlays(1)}
+                        disabled={targetPlays >= 60}
+                        aria-label="Increase cycle target plays"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2.5 leading-snug">
+                  Plays per scale to complete the cycle.
+                </p>
+              </div>
             </div>
 
             {/* Current Cycle Status */}
@@ -684,11 +793,6 @@ export function Settings({
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-xs font-semibold text-foreground">Current Cycle</p>
-                  {cycleDays > 1 && elapsedDays >= cycleDays && (
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                      Buffer Day
-                    </span>
-                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Started: {practiceState.cycleStartDate || 'Today'} · Day {Math.min(elapsedDays, cycleDays)} of {cycleDays}
@@ -696,7 +800,7 @@ export function Settings({
                 {practiceState.reviewPool && practiceState.reviewPool.length > 0 && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
                     <RotateCcw className="w-3 h-3" />
-                    <span>{practiceState.reviewPool.length} failed scale{practiceState.reviewPool.length === 1 ? '' : 's'} queued for Buffer Day review</span>
+                    <span>{practiceState.reviewPool.length} flagged scale{practiceState.reviewPool.length === 1 ? '' : 's'} in review list</span>
                   </p>
                 )}
               </div>
