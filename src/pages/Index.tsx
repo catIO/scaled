@@ -1,10 +1,18 @@
 import { useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Button } from '@/components/ui/button';
-import { Info, ExternalLink, Music, CheckCircle2 } from 'lucide-react';
+import { Info, ExternalLink, Music, Trophy } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
 import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useMetronome } from '@/hooks/useMetronome';
 import { ScaleCard } from '@/components/ScaleCard';
@@ -32,6 +40,7 @@ import {
   getLocalDateString,
   calculatePacedDailyGoal,
   isCycleBufferDay,
+  getScaleCycleTarget,
 } from '@/lib/dateUtils';
 
 // Shuffle array using Fisher-Yates
@@ -262,6 +271,11 @@ export default function Index() {
     'scale-practice-daily-goal-celebrations',
     {}
   );
+  const [cycleCelebratedStartDate, setCycleCelebratedStartDate] = useLocalStorage<string | null>(
+    'scale-practice-cycle-celebrated-date',
+    null
+  );
+  const [showCycleCompleteModal, setShowCycleCompleteModal] = useState(false);
   const [streakState, setStreakState] = useLocalStorage<PracticeStreakState>(
     'scale-practice-streak',
     getInitialStreakState()
@@ -328,7 +342,6 @@ export default function Index() {
   const todayCompleted = dailyRepetitions[todayDayKey] || 0;
   const dailyGoal = settings.dailyGoal || 15;
   const cycleDays = settings.cycleDays || 7;
-  const targetPlays = settings.targetPlays ?? 6;
   const activeCycleStartDate = useMemo(() => {
     return getCurrentCycleStartDate(practiceState.cycleStartDate, cycleDays, today);
   }, [practiceState.cycleStartDate, cycleDays, today]);
@@ -346,6 +359,25 @@ export default function Index() {
   const currentScale = isReviewMode
     ? practiceState.scaleProgress.find((s) => s.name === activeReviewScaleName)
     : practiceState.scaleProgress[currentOrderIndex];
+  const currentScaleTargetPlays = getScaleCycleTarget(
+    dailyGoal,
+    cycleDays,
+    practiceState.scaleProgress.length
+  );
+  const isCycleComplete = useMemo(() => {
+    if (practiceState.scaleProgress.length === 0) return false;
+    return practiceState.scaleProgress.every(
+      (scale) =>
+        getScaleCycleCompletions(scale.history, activeCycleStartDate, cycleDays, today) >=
+        currentScaleTargetPlays
+    );
+  }, [
+    practiceState.scaleProgress,
+    activeCycleStartDate,
+    cycleDays,
+    today,
+    currentScaleTargetPlays,
+  ]);
 
   const isTodaySameDate = practiceState.todayRetriesDate === todayDayKey;
   const todayRetriesList = isTodaySameDate ? (practiceState.todayRetries || []) : [];
@@ -448,6 +480,20 @@ export default function Index() {
     setStreakState,
     todayCompleted,
     todayDayKey,
+  ]);
+
+  useEffect(() => {
+    if (isCycleComplete && cycleCelebratedStartDate !== activeCycleStartDate) {
+      setCycleCelebratedStartDate(activeCycleStartDate);
+      setShowCycleCompleteModal(true);
+      fireConfetti();
+    }
+  }, [
+    isCycleComplete,
+    cycleCelebratedStartDate,
+    activeCycleStartDate,
+    setCycleCelebratedStartDate,
+    fireConfetti,
   ]);
 
   // Reconcile dailyRepetitions and scale history with practiceState (recovers completions on reload or after legacy import)
@@ -785,6 +831,7 @@ export default function Index() {
           cycleCompletions: 0,
         })),
       }));
+      setShowCycleCompleteModal(false);
       toast({
         title: "New Cycle Started",
         description: `Started a fresh ${newCycleDays}-day practice cycle.`,
@@ -962,7 +1009,7 @@ export default function Index() {
                     />
                     <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
                       <span>
-                        Day {currentDayOfCycle} of {cycleDays} · {todayCompleted} of {dailyGoal} daily scales completed
+                        {todayCompleted} of {dailyGoal} daily scales completed
                       </span>
                     </div>
                   </div>
@@ -975,7 +1022,7 @@ export default function Index() {
                     successCount={currentScale.successCount}
                     cycleCompletions={currentScaleCycleCompletions}
                     cycleDays={cycleDays}
-                    targetPlays={targetPlays}
+                    targetPlays={currentScaleTargetPlays}
                     currentRoundPosition={isReviewMode ? currentReviewIndex + 1 : practiceState.currentScaleIndex + 1}
                     totalInRound={isReviewMode ? reviewPool.length : practiceState.practiceOrder.length}
                     onAccept={handleAccept}
@@ -1025,7 +1072,7 @@ export default function Index() {
                   useStreak={settings.useStreak !== false}
                   cycleStartDate={activeCycleStartDate}
                   cycleDays={cycleDays}
-                  targetPlays={targetPlays}
+                  currentDayOfCycle={currentDayOfCycle}
                   today={today}
                   reviewPool={practiceState.reviewPool}
                   onOpenSettings={() => {
@@ -1043,6 +1090,39 @@ export default function Index() {
         isOpen={aboutOpen}
         onClose={() => setAboutOpen(false)}
       />
+
+      <Dialog open={showCycleCompleteModal} onOpenChange={setShowCycleCompleteModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="items-center text-center space-y-3">
+            <div className="w-12 h-12 rounded-full bg-success/15 text-success flex items-center justify-center">
+              <Trophy className="w-6 h-6" />
+            </div>
+            <DialogTitle className="text-xl">Cycle Complete</DialogTitle>
+            <DialogDescription className="text-center">
+              You completed all {practiceState.scaleProgress.length}{' '}
+              {practiceState.scaleProgress.length === 1 ? 'scale' : 'scales'} ({currentScaleTargetPlays}{' '}
+              {currentScaleTargetPlays === 1 ? 'play' : 'plays'} each,{' '}
+              {practiceState.scaleProgress.length * currentScaleTargetPlays} total plays) in your{' '}
+              {cycleDays}-day cycle.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowCycleCompleteModal(false)}
+            >
+              Continue Practicing
+            </Button>
+            <Button
+              type="button"
+              onClick={() => handleStartNewCycle(cycleDays)}
+            >
+              Start New Cycle
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <footer className="pt-4 pb-2 text-xs text-muted-foreground flex items-center justify-center gap-5">
         <button

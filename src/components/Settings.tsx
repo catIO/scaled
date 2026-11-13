@@ -50,7 +50,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Info, ExternalLink, Flame, AlertTriangle, RotateCcw, Minus, Plus, Target, Calendar, CheckCircle2 } from "lucide-react";
+import { Check, ChevronsUpDown, Info, ExternalLink, Flame, AlertTriangle, RotateCcw, Minus, Plus, Target, Calendar } from "lucide-react";
 import { UNIQUE_SCALE_NAMES } from '@/lib/notation';
 import { PracticeSettings, PracticeState } from '@/types/practice';
 
@@ -152,25 +152,20 @@ export function Settings({
   const [showResetStreakConfirm, setShowResetStreakConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const dailyGoal = settings.dailyGoal || 15;
   const cycleDays = settings.cycleDays || 7;
-  const targetPlays = settings.targetPlays ?? 6;
   const elapsedDays = getElapsedDays(practiceState.cycleStartDate);
 
-  const [dailyGoalInput, setDailyGoalInput] = useState(String(settings.dailyGoal || 15));
+  const [dailyGoalInput, setDailyGoalInput] = useState(String(dailyGoal));
   const [cycleDaysInput, setCycleDaysInput] = useState(String(cycleDays));
-  const [targetPlaysInput, setTargetPlaysInput] = useState(String(targetPlays));
 
   useEffect(() => {
-    setDailyGoalInput(String(settings.dailyGoal || 15));
-  }, [settings.dailyGoal]);
+    setDailyGoalInput(String(dailyGoal));
+  }, [dailyGoal]);
 
   useEffect(() => {
     setCycleDaysInput(String(cycleDays));
   }, [cycleDays]);
-
-  useEffect(() => {
-    setTargetPlaysInput(String(targetPlays));
-  }, [targetPlays]);
 
   const handleDailyGoalChange = (val: string) => {
     setDailyGoalInput(val);
@@ -248,45 +243,6 @@ export function Settings({
     onSettingsChange({
       ...settings,
       cycleDays: next,
-    });
-  };
-
-  const handleTargetPlaysChange = (val: string) => {
-    setTargetPlaysInput(val);
-    const parsed = parseInt(val, 10);
-    if (!isNaN(parsed) && parsed >= 1) {
-      onSettingsChange({
-        ...settings,
-        targetPlays: Math.min(60, parsed),
-      });
-    }
-  };
-
-  const handleTargetPlaysBlur = () => {
-    const parsed = parseInt(targetPlaysInput, 10);
-    if (isNaN(parsed) || parsed < 1) {
-      const fallback = targetPlays || 6;
-      setTargetPlaysInput(String(fallback));
-      onSettingsChange({
-        ...settings,
-        targetPlays: fallback,
-      });
-    } else {
-      const clamped = Math.max(1, Math.min(60, parsed));
-      setTargetPlaysInput(String(clamped));
-      onSettingsChange({
-        ...settings,
-        targetPlays: clamped,
-      });
-    }
-  };
-
-  const stepTargetPlays = (delta: number) => {
-    const next = Math.max(1, Math.min(60, targetPlays + delta));
-    setTargetPlaysInput(String(next));
-    onSettingsChange({
-      ...settings,
-      targetPlays: next,
     });
   };
 
@@ -606,7 +562,7 @@ export function Settings({
           {/* Goals Tab */}
           <TabsContent value="goals" className="space-y-6 mt-4">
             {/* Side-by-side Goal & Cycle Inputs */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Daily Goal Input Card */}
               <div className="group relative rounded-xl border border-input/80 bg-muted/20 hover:bg-muted/30 focus-within:bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all p-3.5 flex flex-col justify-between">
                 <div>
@@ -724,66 +680,6 @@ export function Settings({
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-2.5 leading-snug">
                   Days in one cycle before resetting.
-                </p>
-              </div>
-
-              {/* Target Plays per Scale Input Card */}
-              <div className="group relative rounded-xl border border-input/80 bg-muted/20 hover:bg-muted/30 focus-within:bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all p-3.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label
-                      htmlFor="target-plays-input"
-                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider group-focus-within:text-primary transition-colors cursor-pointer"
-                    >
-                      Cycle Target
-                    </Label>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-muted-foreground/60 group-focus-within:text-primary transition-colors" />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-baseline gap-1.5 flex-1 min-w-0">
-                      <Input
-                        id="target-plays-input"
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        max={60}
-                        value={targetPlaysInput}
-                        onChange={(e) => handleTargetPlaysChange(e.target.value)}
-                        onBlur={handleTargetPlaysBlur}
-                        className="h-9 w-20 text-2xl font-bold tracking-tight bg-transparent border-0 p-0 shadow-none focus-visible:ring-0 focus-visible:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-                        {targetPlays === 1 ? 'play / scale' : 'plays / scale'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7 rounded-lg border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
-                        onClick={() => stepTargetPlays(-1)}
-                        disabled={targetPlays <= 1}
-                        aria-label="Decrease cycle target plays"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7 rounded-lg border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
-                        onClick={() => stepTargetPlays(1)}
-                        disabled={targetPlays >= 60}
-                        aria-label="Increase cycle target plays"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-2.5 leading-snug">
-                  Plays per scale to complete the cycle.
                 </p>
               </div>
             </div>

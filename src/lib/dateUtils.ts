@@ -261,6 +261,43 @@ export function calculatePacedDailyGoal(totalScales: number, cycleDays: number =
   return Math.max(1, Math.ceil(totalScales / practiceDays));
 }
 
+export interface CycleTargetSummary {
+  totalPlays: number;
+  perScaleTarget: number;
+}
+
+/**
+ * Calculates the even per-scale cycle target and total cycle plays from daily goal,
+ * cycle duration, and total scales. Rounds up so every scale has the same target.
+ */
+export function calculateCycleTargetSummary(
+  dailyGoal: number,
+  cycleDays: number,
+  totalScales: number
+): CycleTargetSummary {
+  if (totalScales <= 0) {
+    return { totalPlays: 0, perScaleTarget: 1 };
+  }
+  const safeDailyGoal = Math.max(1, dailyGoal || 1);
+  const safeCycleDays = Math.max(1, cycleDays || 1);
+  const perScaleTarget = Math.max(1, Math.ceil((safeDailyGoal * safeCycleDays) / totalScales));
+  return {
+    totalPlays: perScaleTarget * totalScales,
+    perScaleTarget,
+  };
+}
+
+/**
+ * Returns the uniform cycle target plays per scale.
+ */
+export function getScaleCycleTarget(
+  dailyGoal: number,
+  cycleDays: number,
+  totalScales: number
+): number {
+  return calculateCycleTargetSummary(dailyGoal, cycleDays, totalScales).perScaleTarget;
+}
+
 /**
  * Returns whether today is the buffer / review day of the active cycle.
  * Buffer day lockout has been removed so all cycle days are full practice days.

@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Sparkles, X, Flame } from 'lucide-react';
 import { SCALE_DICTIONARY, getBaseScaleName, getOctaveCount, generateMultiOctaveABC } from '@/lib/notation';
-import { getScaleCycleCompletions } from '@/lib/dateUtils';
+import { getScaleCycleCompletions, getScaleCycleTarget } from '@/lib/dateUtils';
 
 const ScaleNotationModal = lazy(() =>
   import('@/components/ScaleNotationModal').then((module) => ({ default: module.ScaleNotationModal }))
@@ -25,7 +25,7 @@ interface ProgressTrackerProps {
   useStreak?: boolean;
   cycleStartDate?: string;
   cycleDays?: number;
-  targetPlays?: number;
+  currentDayOfCycle?: number;
   today?: Date;
   reviewPool?: string[];
 }
@@ -43,7 +43,7 @@ export function ProgressTracker({
   useStreak = true,
   cycleStartDate,
   cycleDays = 7,
-  targetPlays,
+  currentDayOfCycle = 1,
   today,
   reviewPool = [],
 }: ProgressTrackerProps) {
@@ -52,9 +52,26 @@ export function ProgressTracker({
 
   const showStarterTip = !onboardingDismissed && scaleProgress.length <= 1;
 
-  const dailyProgressPct = dailyGoal > 0 ? (todayCompleted / dailyGoal) * 100 : 0;
   const totalScales = scaleProgress.length;
-  const currentScaleNumber = totalScales > 0 ? Math.min(totalScales, currentScaleIndex + 1) : 0;
+  const perScaleTarget = getScaleCycleTarget(dailyGoal, cycleDays, totalScales);
+  const totalCycleTarget = totalScales * perScaleTarget;
+
+  const scaleCycleCounts = useMemo(() => {
+    return scaleProgress.map((scale) =>
+      getScaleCycleCompletions(scale.history, cycleStartDate, cycleDays, today)
+    );
+  }, [scaleProgress, cycleStartDate, cycleDays, today]);
+
+  const completedScalesCount = useMemo(() => {
+    return scaleCycleCounts.filter((count) => count >= perScaleTarget).length;
+  }, [scaleCycleCounts, perScaleTarget]);
+
+  const cappedCyclePlays = useMemo(() => {
+    return scaleCycleCounts.reduce((sum, count) => sum + Math.min(count, perScaleTarget), 0);
+  }, [scaleCycleCounts, perScaleTarget]);
+
+  const cycleProgressPct = totalCycleTarget > 0 ? (cappedCyclePlays / totalCycleTarget) * 100 : 0;
+  const isCycleComplete = totalScales > 0 && completedScalesCount >= totalScales;
 
   const playedIndices = useMemo(() => {
     return new Set(practiceOrder.slice(0, currentScaleIndex));
@@ -62,12 +79,12 @@ export function ProgressTracker({
 
   return (
     <div className="w-full space-y-4">
-      {/* Daily Goal Header */}
+      {/* Cycle Progress Header */}
       <div className="space-y-2">
         <div className="flex items-center justify-between py-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
-              Daily Goal
+              Progress
             </h3>
             {useStreak && streak > 0 && (
               <Tooltip>
@@ -87,22 +104,22 @@ export function ProgressTracker({
             )}
           </div>
           <span className="text-xs font-medium text-muted-foreground">
-            {todayCompleted}/{dailyGoal}
+            {cappedCyclePlays}/{totalCycleTarget} plays
           </span>
         </div>
 
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ease-out ${
-              todayCompleted >= dailyGoal ? 'bg-success' : 'bg-primary'
+              isCycleComplete ? 'bg-success' : 'bg-primary'
             }`}
-            style={{ width: `${Math.min(dailyProgressPct, 100)}%` }}
+            style={{ width: `${Math.min(cycleProgressPct, 100)}%` }}
           />
         </div>
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>Round {round}</span>
-          <span>Scale {currentScaleNumber} of {totalScales}</span>
+          <span>Day {currentDayOfCycle} of {cycleDays}</span>
+          <span>{completedScalesCount}/{totalScales} {totalScales === 1 ? 'scale' : 'scales'}</span>
         </div>
       </div>
 
@@ -121,15 +138,10 @@ export function ProgressTracker({
               }
             : null;
 
-          const effectiveTarget = targetPlays ?? (cycleDays > 1 ? cycleDays - 1 : 1);
-          const cyclePlays = getScaleCycleCompletions(
-            scale.history,
-            cycleStartDate,
-            cycleDays,
-            today
-          );
+          const effectiveTarget = perScaleTarget;
+          const cyclePlays = scaleCycleCounts[idx] ?? 0;
           const isScaleCompleted = cyclePlays >= effectiveTarget;
-          const progress = Math.min(100, (cyclePlays / effectiveTarget) * 100);
+          const progress = effectiveTarget > 0 ? Math.min(100, (cyclePlays / effectiveTarget) * 100) : 100;
 
           return (
             <div
