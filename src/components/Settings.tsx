@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { MdSettings, MdAdd, MdDelete, MdFileUpload, MdFileDownload } from 'react-icons/md';
 import { toast } from '@/components/ui/use-toast';
 import { CONTROL_BUTTON_SIZE, CONTROL_ICON_SIZE } from '@/lib/constants';
-import { getLocalDateString, getElapsedDays } from '@/lib/dateUtils';
+import { getLocalDateString, getElapsedDays, getCurrentCycleStartDate } from '@/lib/dateUtils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -154,7 +154,8 @@ export function Settings({
 
   const dailyGoal = settings.dailyGoal || 15;
   const cycleDays = settings.cycleDays || 7;
-  const elapsedDays = getElapsedDays(practiceState.cycleStartDate);
+  const activeCycleStartDate = getCurrentCycleStartDate(practiceState.cycleStartDate, cycleDays);
+  const elapsedDays = getElapsedDays(activeCycleStartDate);
 
   const [dailyGoalInput, setDailyGoalInput] = useState(String(dailyGoal));
   const [cycleDaysInput, setCycleDaysInput] = useState(String(cycleDays));
@@ -691,7 +692,7 @@ export function Settings({
                   <p className="text-xs font-semibold text-foreground">Current Cycle</p>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Started: {practiceState.cycleStartDate || 'Today'} · Day {Math.min(elapsedDays, cycleDays)} of {cycleDays}
+                  Started: {activeCycleStartDate} · Day {Math.min(elapsedDays, cycleDays)} of {cycleDays}
                 </p>
                 {practiceState.reviewPool && practiceState.reviewPool.length > 0 && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
@@ -718,7 +719,7 @@ export function Settings({
                 <div className="space-y-0.5 pr-4">
                   <Label htmlFor="use-streak-toggle" className="text-sm font-medium">Practice Streak</Label>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Track daily practice consistency. Streaks do not reset automatically on missed days.
+                    Track consecutive days you meet your daily goal. Resets if you miss a day.
                   </p>
                 </div>
                 <Switch

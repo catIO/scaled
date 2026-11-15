@@ -39,8 +39,16 @@ export function getDayKey(date: Date = new Date()): string {
 }
 
 /**
+ * Returns the number of calendar days between two 'YYYY-MM-DD' date strings (to - from).
+ */
+export function getDayDiff(fromDateStr: string, toDateStr: string): number {
+  const from = getStartOfDay(parseLocalDate(fromDateStr));
+  const to = getStartOfDay(parseLocalDate(toDateStr));
+  return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/**
  * Calculates completed days where the daily goal was met.
- * Streaks do not reset automatically on missed days.
  */
 export function calculateCompletedDays(
   dailyRepetitions: Record<string, number>,
@@ -76,16 +84,29 @@ export function calculateCompletedDays(
 }
 
 /**
- * Calculates the practice streak without automatic reset.
- * Each day the daily goal is met adds to the streak.
+ * Calculates the consecutive-day practice streak ending today (or yesterday if today is not yet complete).
+ * Resets to 0 if a full calendar day was missed.
  */
 export function calculateDailyStreak(
   dailyRepetitions: Record<string, number>,
   dailyGoal: number,
-  _today: Date = new Date()
+  today: Date = new Date()
 ): number {
-  if (dailyGoal <= 0) return 0;
-  return calculateCompletedDays(dailyRepetitions, dailyGoal).count;
+  if (dailyGoal <= 0 || !dailyRepetitions || typeof dailyRepetitions !== 'object') return 0;
+
+  const cursor = getStartOfDay(today);
+  const todayKey = getDayKey(cursor);
+  if ((Number(dailyRepetitions[todayKey]) || 0) < dailyGoal) {
+    // Today isn't completed yet; check if yesterday kept the streak alive
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  let streak = 0;
+  while ((Number(dailyRepetitions[getDayKey(cursor)]) || 0) >= dailyGoal) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
 }
 
 /**

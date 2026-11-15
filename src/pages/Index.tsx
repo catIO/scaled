@@ -30,6 +30,7 @@ import {
 import { getNextFingerCombination } from '@/lib/fingerCombinations';
 import {
   getDayKey,
+  getDayDiff,
   calculateDailyStreak,
   calculateCompletedDays,
   deriveDailyRepetitions,
@@ -126,6 +127,13 @@ const getInitialStreakState = (): PracticeStreakState => {
         return { streak: parsed };
       }
       if (parsed && typeof parsed.streak === 'number') {
+        if (
+          parsed.streak > 0 &&
+          typeof parsed.lastCompletedDate === 'string' &&
+          getDayDiff(parsed.lastCompletedDate, getDayKey()) > 1
+        ) {
+          return { streak: 0 };
+        }
         return parsed;
       }
     }
@@ -135,10 +143,11 @@ const getInitialStreakState = (): PracticeStreakState => {
     const goal = savedSettings ? (JSON.parse(savedSettings).dailyGoal || 10) : 10;
     if (savedReps) {
       const reps = JSON.parse(savedReps) as Record<string, number>;
+      const streak = calculateDailyStreak(reps, goal);
       const completed = calculateCompletedDays(reps, goal);
       return {
-        streak: completed.count,
-        lastCompletedDate: completed.lastCompletedDate,
+        streak,
+        lastCompletedDate: streak > 0 ? completed.lastCompletedDate : undefined,
       };
     }
   } catch (e) {
@@ -457,21 +466,28 @@ export default function Index() {
       }));
     }
 
-    if (reachedDailyGoal) {
-      setStreakState((prev) => {
-        const currentStreak = typeof prev === 'number' ? prev : (prev?.streak || 0);
-        const lastDate = typeof prev === 'object' ? prev?.lastCompletedDate : undefined;
+    setStreakState((prev) => {
+      const currentStreak = typeof prev === 'number' ? prev : (prev?.streak || 0);
+      const lastDate = typeof prev === 'object' ? prev?.lastCompletedDate : undefined;
+      const missedDay = Boolean(lastDate && getDayDiff(lastDate, todayDayKey) > 1);
 
+      if (reachedDailyGoal) {
         if (lastDate === todayDayKey) {
           return typeof prev === 'object' ? prev : { streak: currentStreak, lastCompletedDate: todayDayKey };
         }
 
         return {
-          streak: currentStreak + 1,
+          streak: missedDay ? 1 : currentStreak + 1,
           lastCompletedDate: todayDayKey,
         };
-      });
-    }
+      }
+
+      if (missedDay && currentStreak > 0) {
+        return { streak: 0 };
+      }
+
+      return prev;
+    });
   }, [
     dailyGoal,
     dailyGoalCelebrations,
@@ -802,8 +818,15 @@ export default function Index() {
     setPracticeState(initializePracticeState(settings));
     setDailyRepetitions({});
     setDailyGoalCelebrations({});
-    setStreakState({ streak: 0 });
-  }, [settings, setDailyGoalCelebrations, setDailyRepetitions, setPracticeState, setStreakState]);
+    setCycleCelebratedStartDate(null);
+    setShowCycleCompleteModal(false);
+  }, [
+    settings,
+    setCycleCelebratedStartDate,
+    setDailyGoalCelebrations,
+    setDailyRepetitions,
+    setPracticeState,
+  ]);
 
   const handleStartNewCycle = useCallback(
     (newCycleDays: number) => {
@@ -1106,19 +1129,12 @@ export default function Index() {
               {cycleDays}-day cycle.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="sm:justify-center gap-2 pt-2">
+          <DialogFooter className="sm:justify-center pt-2">
             <Button
               type="button"
-              variant="outline"
               onClick={() => setShowCycleCompleteModal(false)}
             >
-              Continue Practicing
-            </Button>
-            <Button
-              type="button"
-              onClick={() => handleStartNewCycle(cycleDays)}
-            >
-              Start New Cycle
+              Keep Practicing
             </Button>
           </DialogFooter>
         </DialogContent>

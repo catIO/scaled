@@ -6,7 +6,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Info, CheckCircle2, Music, Target, Flame } from 'lucide-react';
+import { ExternalLink, Info, CheckCircle2, Music, Target, Flame, Shuffle } from 'lucide-react';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -20,18 +20,23 @@ const STEPS = [
     icon: Target,
   },
   {
+    title: 'Random Non-Repeating Selection',
+    description: 'Scales are chosen at random without repeating until every scale in your list has been played once.',
+    icon: Shuffle,
+  },
+  {
     title: 'Finger Combinations',
     description: 'Select right-hand finger patterns (e.g., i-m, m-i, a-m-i) to cycle through while practicing.',
     icon: Music,
   },
   {
-    title: 'Practice & Record',
+    title: 'Practice & Track Success',
     description: 'Play the prompted scale and mark clean runs with Accept. Declined scales re-queue for retry later today or move to the review list.',
     icon: CheckCircle2,
   },
   {
-    title: 'Non-Repeating Selection & Streaks',
-    description: 'Scales are chosen randomly without repeating until all scales have been played once. Practice daily to build your streak, which does not reset automatically.',
+    title: 'Daily Streaks',
+    description: 'Meet your daily scale goal each day to build your streak—missing a day resets it.',
     icon: Flame,
   },
 ];
